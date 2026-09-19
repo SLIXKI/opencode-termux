@@ -1,138 +1,303 @@
-# opencode-mobile
+# opencode-mobile — maintainer notes
 
 > **Brought to you by @FeaturisticLeaks X @slixki**
-> Last updated: 2026-08-01
-> Companion logs: `opencode-mobile-PROGRESS.md` (full session history)
+> Package version: **2.0.0** · Last updated: 2026-09-19
+> User-facing docs: `README.md` (repo root), `INSTALL.txt`, `GUIDE.md`
+> Error reference: `docs/TROUBLESHOOTING.md`
+
+Internal handoff notes. Not part of the distributed zip — users never see this.
 
 ---
 
-## ✅ Status: SHIPPING READY (v1.3)
+## Status
 
-**`opencode-mobile-v1.3.zip`** on Desktop is the final, QA-passed package (9 files, folder-prefixed).
-v1.2 was confirmed working on the user's real ARM64 phone. The v1.3 fixes are **sandbox-verified but NOT yet device-tested** — the one remaining step before sharing widely.
+**v2.0.0 — shipped.** Supersedes v1.3.
+
+The change that forced this release: the OpenCode Zen gateway raised its minimum
+client version to **1.18.0**, and the only Termux build this package used
+(`guysoft/opencode-termux` v0.2.1) is **opencode 1.17.9**. Every user hit:
+
+```
+Error from provider (Console): OpenCode 1.18.0 or newer is required to use the free tier
+```
+
+There is no fix inside the old design — guysoft has not published a release since
+2026-06-25 and its CI last ran 2026-07-21. So the install path was replaced.
 
 ---
 
-## 📦 What to share (2 files, both on Desktop)
+## What changed in v2.0.0
 
-1. **`opencode-mobile-v1.3.zip`** — the complete package (9 files)
-2. **`INSTALL.txt`** — the one-page guide (share alongside the zip)
+### 1. New install source — this is the actual fix
 
-Old zips (v1.0, v1.1, v1.2) deleted from Desktop.
+| | v1.3 | v2.0.0 |
+|---|---|---|
+| Source | `guysoft/opencode-termux` zip | `bd-loser/opencode-bionic` `.deb` |
+| opencode | 1.17.9 (June 2026) | **1.18.31** (tracks upstream automatically) |
+| Size | 49.6 MB zip → ~180 MB installed | 34.8 MB `.deb` |
+| Checksum | none | **SHA256SUMS verified** |
+| Fallback | none | npm `opencode-termux` (official musl build) |
+| Last release | 2026-06-25, stale | rebuilt every 12 h from upstream |
 
----
+`bd-loser/opencode-bionic` (MIT, 12★) cross-compiles a patched Bun 1.4.2 for
+Bionic and builds opencode from the upstream release tag, so the binary reports a
+clean `1.18.31`. Its `watch-upstream.yml` polls upstream and re-releases
+automatically — which is what keeps this package from going stale again.
 
-## 🗂 Package structure (working folder: `Desktop\opencode for mobile\`)
+The npm fallback (`C04-wq/opencode-termux`, MIT, 29★) repackages opencode's
+**official** `linux-arm64-musl` build with a `patchelf`'d musl loader wired to
+Termux's DNS. Rebuilt every 6 h, checksum-verified.
 
-| File | Job |
+`guysoft` 1.17.9 is deliberately **not** a fallback: it is below the floor, so it
+would reproduce the exact error being fixed. Better to fail loudly.
+
+### 2. Version-string validation (the non-obvious part)
+
+The free-tier gate parses the version out of the client `User-Agent` and requires
+**plain semver**. Verified against `https://opencode.ai/zen/v1/responses`:
+
+| `User-Agent` | Result |
 |---|---|
-| `INSTALL.txt` | One-page install guide (extract → navigate → `bash install.sh`) |
-| `install.sh` | Fully-automatic installer |
-| `uninstall.sh` | One-command uninstaller (now also undoes the ⌨ keyboard change) |
-| `requirements.txt` | Prerequisites (curl unzip git ripgrep openssh nodejs-lts) |
-| `config/opencode.json` | Free models + default model = `opencode/deepseek-v4-flash-free` |
-| `config/AGENTS.md` | opencode rules + REQUIRED greeting line |
-| `config/Memory.template.md` | Memory-file template |
-| `README.md` | Full step-by-step (includes device-support warning) |
-| `GUIDE.md` | Complete beginner's guide |
+| `opencode/1.18.31` | 200 ✅ |
+| `opencode/1.18.31.r12.g88c6c7a` | 403 ❌ git-describe |
+| `opencode/1.18.31-dev.f1aacaba` | 403 ❌ dev build |
+| `opencode/1.18.4-8` | 403 ❌ packaging suffix |
+| `opencode/1.17.9` | 403 ❌ too old |
 
----
+So installing "something recent" is not enough. `install.sh` now:
 
-## ✅ Everything fixed in v1.3
+- resolves through `/releases/latest`, which **excludes prereleases** — a `-dev.`
+  build can never be selected by accident,
+- refuses any tag matching `*-dev.*` or `*-*` outright,
+- runs `opencode --version` and requires `^[0-9]+\.[0-9]+\.[0-9]+$` **and**
+  `>= 1.18.0`,
+- discards a source that fails validation and tries the next one.
 
-1. **Keyboard (⌨) toggle bug** — old Step9 skipped adding the button when `~/.termux/termux.properties` already had an `extra-keys` line. Now **injects `KEYBOARD`** as the first button of an existing row (GNU sed first-match replace), keeps the user's keys, saves a backup (`termux.properties.opencode-backup`). Fresh installs get the full default row.
-2. **Zip folder structure** — entries were flat (files dumped loose into `~/storage/downloads`, so `cd opencode-mobile` failed). Rebuilt with a top-level `opencode-mobile/` prefix on all 9 entries.
-3. **curl auto-repair** — a prerequisite `pkg install` can upgrade curl+libngtcp2 and break curl (missing-symbol class). `repair_curl()` (`apt update && apt full-upgrade -y`) now auto-runs at **3 points**: initial `check_curl`, post-prerequisite re-check, and pre-download in `install_native()`.
-4. **`pkg upgrade -y` added to prerequisites** — reconciles stale package sets (the real cause of the emulator's curl breakage). Guarded; `repair_curl` backstops.
-5. **Arch guard** — keys off `dpkg --print-architecture` (uname -m lies on some emulators). Non-aarch64 → clear skip message, no wasted 52MB download.
-6. **Success banner gated on `opencode_ok`** — if opencode isn't actually working, setup stops cleanly BEFORE config/key/AI-shortcut and exits 1 (no half-configured phone).
-7. **`install_native` returns 1** on verify-failure (was faking success).
-8. **Uninstaller completeness** — restores `termux.properties.opencode-backup` or removes the appended keyboard block.
+There is a **second gate**: `x-opencode-session` must be a real opencode session
+ID (`ses_` + 12 hex + 14 base62). Genuine opencode always produces these, so it
+only affects people scripting the API directly. Upstream has said the free tier
+is intentionally unavailable to third-party harnesses.
 
----
+### 3. Model limits were wrong for all nine models
 
-## 📱 Device support (decision confirmed by user, 2026-08-01)
+`config/opencode.json` declared `context: 131072, output: 8192` for every Zen
+model. Real values (from the models.dev catalogue opencode itself consumes):
 
-| Device | Behavior |
+| Model | Was | Now |
+|---|---|---|
+| `deepseek-v4-flash-free` (default) | 131072 / 8192 | **200000 / 128000** |
+| `nemotron-3-ultra-free` | 131072 / 8192 | **1000000 / 128000** |
+| `north-mini-code-free` | 131072 / 8192 | 256000 / 64000 |
+| `ling-3.0-flash-free` | 131072 / 8192 | 262144 / 32768 |
+| `mimo-v2.5-free` | 131072 / 8192 | 200000 / 32000 |
+| `laguna-s-2.1-free` | 131072 / 8192 | 256000 / 32000 |
+| `big-pickle` | 131072 / 8192 | 200000 / 32000 |
+
+Output was understated up to **16×**. opencode uses `limit.output` as the
+max-tokens ceiling, so long file writes were being truncated mid-file — directly
+harming the "generate a whole Android project" use case. It also uses
+`limit.context` to trigger auto-compaction, so sessions compacted far too early.
+That matters twice over: compaction is precisely where the September 2026
+free-tier failures clustered.
+
+Also added `nemotron-3.5-lightning-free` and `hy3-free` (currently free, were
+missing), and changed `small_model` to `opencode/big-pickle` so background
+summarisation does not compete with the main model's rate limit.
+
+### 4. Dropped hardcoded Google/OpenRouter model IDs
+
+The old config pinned `deepseek/deepseek-chat-v3-0324:free` and
+`qwen/qwen-2.5-72b-instruct:free` — 2025-era OpenRouter listings, very likely
+gone. Both providers are now configured with just an `apiKey`; opencode pulls
+their full live catalogues from models.dev. Nothing to go stale.
+
+### 5. `uninstall.sh` was unsafe
+
+It ran `rm -rf "$HOME/opencode"` (every user project) with **no prompt and no
+backup**, and with `$PREFIX` unset it ran `rm -rf /libexec/opencode` and
+`rm -f /lib/libc++_shared.so` — real paths outside Termux. Then it printed
+*"Your phone stays as it was; nothing else was touched."* False twice: it had
+deleted all projects, **and** it left `~/.local/share/opencode/auth.json` behind,
+so keys added via `/connect` survived.
+
+Now: refuses to run outside Termux, keeps `~/opencode` by default and prompts
+before deleting it, offers a tarball backup, archives config before removal,
+asks separately about session history + saved keys, cleans up both the `.deb` and
+the npm runtime, and strips the injected `KEYBOARD` token from a pre-existing
+key row. The closing message states what was actually kept.
+
+### 6. Keyboard (⌨) injection — the v1.3 fix was half a fix
+
+v1.3 claimed to handle an existing `extra-keys` row. It only matched the two-row
+`[[...]]` form. Tested against seven real configs, three failed:
+
+| `termux.properties` | v1.3 | v2.0.0 |
+|---|---|---|
+| `extra-keys = ['ESC','TAB']` (one row — very common) | ❌ | ✅ |
+| `extra-keys=['ESC','TAB']` (one row, no spaces) | ❌ | ✅ |
+| tab-indented `extra-keys` | ❌ | ✅ |
+| `extra-keys-style = dark` with no `extra-keys` | ❌ | ✅ |
+| two-row `[[...]]` | ✅ | ✅ |
+| already has `KEYBOARD` | ✅ | ✅ |
+
+Two bugs: the sed pattern required `[[`, and `grep "^[[:space:]]*extra-keys"`
+also matched **`extra-keys-style`**, routing those users into a branch that
+always failed. Worse, the failure path did not fall back to appending a row —
+so the user ended up with **no ⌨ button at all**, the exact symptom v1.3 was
+meant to fix.
+
+Now: the key is matched exactly, both row forms are handled, and if injection
+still fails a row is **appended** instead (Java Properties takes the last value
+for a duplicate key) so there is never a dead end. All nine scenarios verified.
+
+### 7. The `AI` shortcut broke per-project memory
+
+It did `cd "$HOME/opencode" && opencode` — the **parent** of every project. That
+collapsed all projects into one opencode project root, so `Memory.md` landed at
+`~/opencode/Memory.md` instead of per-project, and `/sessions` mixed everything
+together. It also contradicted `GUIDE.md`, which told users to `cd myapp` first.
+
+Now: `AI` opens opencode in the current directory (from `$HOME`, it goes to
+`~/opencode`), and `AI myapp` creates/opens that project. Idempotent — re-running
+the installer replaces the old definition rather than stacking a second one.
+
+### 8. Rules no longer follow users into other repos
+
+`config/AGENTS.md` is installed to `~/.config/opencode/AGENTS.md`, opencode's
+**global** rules path, so it applied to every session on the phone — including
+the AIDE/AndroidIDE projects `GUIDE.md` §8 encourages users to open. It mandated
+creating `Memory.md` "on every meaningful step", which dropped files into other
+people's git repos, and mandated the branding greeting on **every** message.
+
+Now: memory writes are scoped to `~/opencode/` and explicitly forbidden elsewhere
+without being asked; the greeting is once per session and must not leak into
+code, commits or files; checkpoint-based memory updates instead of per-edit; and
+the rules include real guidance for `FreeTierError` (do not retry-loop, switch
+model, `/compact` early, mention the 1.18.0 floor).
+
+Also removed the duplicate: the old config had both
+`~/.config/opencode/AGENTS.md` *and* `instructions: ["~/opencode/AGENTS.md"]`
+pointing at an identical second copy, so the same rules were injected into the
+prompt twice. The installer deletes the stale `~/opencode/AGENTS.md`.
+
+### 9. Documentation errors corrected
+
+| Was | Now |
 |---|---|
-| **Real ARM64 phone** (aarch64) | ✅ Full support — native build installs and runs (proven in v1.2) |
-| **x86_64 Android emulators** (MuMu, GameLoop, BlueStacks) | ⏭ Clean skip: "cannot run on x86_64 emulators — use a real ARM64 phone or ARM64 emulator" |
-| **32-bit devices** | ⏭ Same clean skip |
+| "press `q` or Ctrl + C" to stop an answer (×2) | **Esc** — Ctrl+C exits opencode. The guide contradicted itself at line 527. |
+| "Sign-up asks for billing details" | **No card, no billing details.** Contradicted "no card required" in three other files. |
+| config at "`~/opencode` → `config/opencode.json`" | `~/.config/opencode/opencode.json` |
+| "four free models … six more" | nine Zen free models + two optional providers |
+| `/undo` = "undoes the last change" | also: **requires a git repository** |
+| `requirements.txt`: "ssh keys are created during install" | no `ssh-keygen` exists anywhere; marked OPTIONAL |
+| README `nodejs` vs requirements `nodejs-lts` | consistent |
+| INSTALL.txt "3 minutes" vs README "10 minutes" | "a few minutes" |
 
-**Why:** opencode (anomalyco/opencode) is a **Bun-compiled app** (`bun build --compile`). Bun has no Android support, so `guysoft/opencode-termux` cross-compiled the whole Bun runtime + WebKit/JavaScriptCore engine from source — **aarch64 only**. Official opencode releases (v1.18.10) ship only linux-x64 + linux-arm64; **no 32-bit builds exist anywhere**, and Termux 32-bit is EOL.
+Added: `/compact`, `/redo`, `/init`, `/export`, a `git init` step in the
+walkthrough, and an explanation of why `limit` values must be accurate.
 
----
+### 10. Repo hygiene
 
-## 🧠 Key facts for resuming
+- **Root `README.md`** — there was none, so the GitHub landing page showed only a
+  folder named `opencode for mobile`.
+- **`LICENSE`** (MIT) — the package is explicitly redistributed, with no grant of
+  rights before. Notes that downloaded binaries carry upstream licences.
+- **`.gitignore`**, **`docs/TROUBLESHOOTING.md`**.
+- **`build-package.sh`** — the zip was a hand-built duplicate of nine files with
+  no build script; the regeneration rule existed only as prose describing a
+  Windows PowerShell/.NET recipe. Now generated on any POSIX system, with a
+  `--check` mode that fails on drift.
+- Executable bits set on all three scripts (were `644`, so `./install.sh` failed).
+- Legacy `guysoft` artifacts (`$PREFIX/libexec/opencode`, three `.so` files,
+  ~180 MB) are purged on upgrade instead of being left to shadow the new binary.
 
-### The user flow (what recipients do)
-1. Install Termux from F-Droid (NOT Play Store).
-2. `termux-setup-storage` → tap ALLOW.
-3. Put zip in Downloads.
-4. `cd ~/storage/downloads` → `unzip -o opencode-mobile-v1.3.zip` → `cd opencode-mobile` → `bash install.sh`
-5. Paste free OpenCode key from https://opencode.ai/auth (Enter = skip, add later with `/connect`).
-6. Reopen Termux → type `AI`.
+### 11. Installer robustness
 
-### Installer steps (all automatic)
-Banner → Termux check (PREFIX) → `check_curl` (auto-repairs broken curl) → `pkg update` + `pkg upgrade` → prerequisites from `requirements.txt` → storage (auto) → **install native aarch64 opencode** → copy config (opencode.json + AGENTS.md ×2 + Memory.template) → **OpenCode API key prompt** (saved as `OPENCODE_API_KEY` in `~/.bashrc`) → `AI` shortcut → **⌨ keyboard toggle** → success banner.
-
-### Zip build rule (IMPORTANT)
-Zip must use **forward slashes** AND a **top-level `opencode-mobile/` prefix** on every entry. PowerShell `Compress-Archive` breaks both (writes `\`, no prefix). Use .NET `System.IO.Compression.ZipArchive` with `"opencode-mobile/" + rel` entry names.
-
-### Download URL resolution
-GitHub API → known-good hardcoded URL → interactive paste fallback.
-Hardcoded: `https://github.com/guysoft/opencode-termux/releases/download/v0.2.1/opencode-1.17.9-android-aarch64.zip` (~52MB)
-
-### Installer idempotency
-Re-running `install.sh` is safe: skips opencode re-download if working, skips existing `OPENCODE_API_KEY`, existing `AI()`, existing ⌨ button.
-
-### Config / memory
-- Default model: `opencode/deepseek-v4-flash-free` (OpenCode Zen free, 7 free models)
-- **Zen free models (7)**: deepseek-v4-flash-free (default), mimo-v2.5-free, north-mini-code-free, nemotron-3-ultra-free, ling-3.0-flash-free, laguna-s-2.1-free, big-pickle. Authoritative list = `https://opencode.ai/zen/v1/models`. `-free` suffix is NOT a reliable free/paid indicator (big-pickle is free).
-- Config opencode provider: `apiKey: "{env:OPENCODE_API_KEY}"`, `baseURL: "https://opencode.ai/zen/v1"`.
-- Optional providers in config: Google Gemini (`GEMINI_API_KEY`), OpenRouter (`OPENROUTER_API_KEY`) — not prompted by installer, add manually.
-- Memory system: `Memory.md` auto-created per project under `~/opencode/<project>/` from `~/opencode/Memory.template.md`; AGENTS.md requires the greeting "Brought to you by @FeaturisticLeaks X @slixki".
-- **Uninstall warning:** `cd ~/storage/downloads/opencode-mobile && bash uninstall.sh` also deletes your `~/opencode` projects — back them up first if you care about them.
-- Keyboard backup alternative: `termux-ime toggle` after `pkg install termux-api` also toggles the soft keyboard (the `KEYBOARD` macro = `onToggleSoftKeyboardRequest()` in termux-app source).
+Added: SHA-256 verification · `curl -C -` resume with a persistent cache dir
+(`~/.cache/opencode-mobile`) · free-space check · full log to
+`~/opencode-mobile-install.log` · `PACKAGE_VERSION` stamp · API-key replacement
+instead of appending duplicates · `chmod 600 ~/.bashrc` · `/dev/tty` for all
+prompts so `curl | bash` cannot swallow the script into a `read` · non-interactive
+mode · env overrides for source, version and key.
 
 ---
 
-## 🔧 Known gotchas / troubleshooting
+## Key facts for resuming
 
-- **curl breaks mid-install** → auto-repaired (full-upgrade). If it still fails: `apt update && apt full-upgrade -y` manually, then re-run.
-- **Commands jumbled** (`-ypkg`, `unzipunzip`) → user pasted multiple commands; tell them one per line.
-- **"No command ai found"** → shortcut only loads in a fresh Termux session / after re-running installer. Expected, not a bug.
-- **opencode installed but won't run** → restart Termux, try `opencode --version`.
-- **On emulators** → opencode physically cannot run (aarch64-only). Don't test there; use the real ARM64 phone.
+### Distribution
+```bash
+curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
+```
+`install.sh` is **self-contained by necessity** — piped into bash, it cannot read
+sibling files, so `config/` is embedded as heredocs between
+`# ==== BEGIN GENERATED EMBEDDED CONFIG ====` markers. **`config/` is the source
+of truth**; regenerate with `./build-package.sh`, verify with
+`./build-package.sh --check`. Never hand-edit the embedded block.
+
+### Env overrides
+`OPENCODE_VERSION` · `OPENCODE_SOURCE=auto|bionic|npm` · `OPENCODE_API_KEY` ·
+`OPENCODE_MOBILE_YES=1` · `OPENCODE_MOBILE_NO_KEYBOARD=1` ·
+`OPENCODE_MOBILE_DELETE_PROJECTS=1` / `_DELETE_DATA=1` (uninstall)
+
+### Upstream
+- opencode: `anomalyco/opencode` — v1.18.31 at time of writing; **v2 announced**
+- Bionic builds: `bd-loser/opencode-bionic` — stable + daily `-dev.` prereleases
+- musl repackaging: `C04-wq/opencode-termux` — npm, 6-hourly
+- Original cross-compile: `guysoft/opencode-termux` — **stale at 1.17.9**
+- Zen free tier floor: **1.18.0**, clean semver in `User-Agent`, valid `ses_` session ID
+- Live free-model list: `https://opencode.ai/zen/v1/models`
+- Free-tier key (no card): `https://opencode.ai/auth`
+
+### Known upstream instability (September 2026)
+`anomalyco/opencode#49433` (45 comments) — a wave of `FreeTierError` on
+**official** 1.18.30/1.18.31 across macOS/Linux/Windows. Clustered around
+**auto-compaction**, often at ~70% of context; normal messages succeeded while
+compaction failed and then poisoned the session. Partly fixed server-side within
+hours, but #49918 and #49944 were filed afterwards. Also reported: custom primary
+agents failing where built-in `build`/`plan` succeed, and denied tool permissions
+as a deterministic trigger.
+
+This is **not** something the package can fix, so the config and rules are tuned
+to reduce exposure: correct (larger) context limits mean fewer compactions, and
+`AGENTS.md` tells the agent not to retry-loop and to suggest `/compact` early or
+`/new`.
 
 ---
 
-## 📌 What's left to do
+## Verification performed
 
-- [ ] **Device-test v1.3 on the real phone** (transfer new zip, clean loose files in Downloads, `unzip -o`, `bash install.sh`, check ⌨ button + `AI`). This is the ONLY thing between "sandbox-verified" and "share widely."
-- [ ] Optional: full prose review of `GUIDE.md` (installer already fully reviewed).
-- [ ] Optional: hide API-key input with `read -s` (currently visible by design — hidden input hides paste errors).
-- [ ] Optional: add "how to uninstall" to INSTALL.txt.
-- [ ] Optional: add a small config so users can set their own model per project.
-- [ ] Optional: add a changelog file to the package.
+- `bash -n` on `install.sh`, `uninstall.sh`, `build-package.sh`
+- `config/opencode.json` parses as JSON; embedded heredocs byte-match `config/`
+- Version gate against 16 real-world strings, including every rejected form above
+- `ver_ge` numeric edge cases (`1.18.9` vs `1.18.10`, `1.8.0` vs `1.10.0`)
+- Keyboard injection across **9** `termux.properties` scenarios (v1.3 failed 3)
+- `.bashrc` rewrite: old v1.3 shortcut replaced, and **3 consecutive runs** leave
+  exactly one `AI()` definition and one marker
+- `AI()` behaviour from `$HOME`, from inside a project, and with an argument
+- `uninstall.sh`: refuses with `$PREFIX` unset; non-interactive run keeps
+  projects and keys, backs up config, removes the binary and the `KEYBOARD` token
+- Live: both tag-resolution routes (GitHub API and web redirect) return
+  `v1.18.31`; the `.deb` and `SHA256SUMS` assets exist
+- Zip: prefix, forward slashes, required entries, extraction, and byte-identity
+  of the extracted `install.sh`
+
+**Not yet done:** an end-to-end run on a real ARM64 phone. That is the one gap
+between "verified in sandbox" and "share widely" — same as it was for v1.3.
 
 ---
 
-## 📝 Session history (what was fixed, version by version)
+## Open items
 
-- **v1.0** — created package. Broken: npm EBADPLATFORM + native URL resolution failed on device.
-- **v1.1** — native-only installer, fixed URL resolver (API → hardcoded → paste fallback), curl `--retry 3`, removed redundant ripgrep. Rebranded to **@FeaturisticLeaks X @slixki**.
-- **v1.2** — fully automatic (no y/n), `requirements.txt`, OpenCode-key prompt (was Gemini), `AI` shortcut, default model → zen, added `uninstall.sh`, added **⌨ keyboard toggle**, INSTALL.txt guide. **CONFIRMED WORKING on device.**
-- **v1.3** — **keyboard toggle bug fix**: Step9 skipped adding ⌨ if `termux.properties` already had an `extra-keys` line. Now injects `KEYBOARD` into the existing row (GNU sed `0,/re/` first-match replace, verified locally on 3 scenarios), backups to `$props.opencode-backup`. INSTALL.txt now references `opencode-mobile-v1.3.zip`.
-- **v1.3 (round 2)** — **zip folder-structure fix**: entries were flat (files at zip root → unzipped loose into `~/storage/downloads`, `cd opencode-mobile` failed). Rebuilt with a top-level `opencode-mobile/` prefix on all 9 entries. INSTALL.txt updated: "5 steps" (was "4"), explains the zip creates the `opencode-mobile` folder, adds safe file-manager cleanup for loose files. Verified with a real test-extraction.
-- **v1.3 (round 3)** — **curl auto-repair + arch guard**. Device test on an **x86_64 Android emulator**: `check_curl` passed, but prerequisites `pkg install` upgraded curl 8.12.1→8.21.0 + fresh libngtcp2 1.25.0 and **broke curl again** (missing-symbol class). Fix: `repair_curl()` (`apt update && apt full-upgrade -y`) auto-runs at the post-prerequisite check AND defensively before the download (`curl_ok()`). Discovered the `guysoft/opencode-termux` release is **aarch64-only**. Arch check now keys off `dpkg --print-architecture` (uname -m lies on some emulators: reported aarch64 while apt used x86_64) and **skips with a clear "cannot run on x86_64 emulators" message** instead of wasting a 52MB download.
-- **v1.3 (QA pass, 2026-08-01)** — full review of all 9 files. Fixed: (1) **success banner lied** — said "ready, type AI" even when opencode never installed; now `opencode_ok` gates everything — setup stops cleanly BEFORE config/key/AI-shortcut and exits 1. (2) **`install_native` returned 0 even on verify failure** — now returns 1. (3) **`pkg update` alone left stale packages** (the actual cause of the emulator's curl breakage) — added `pkg upgrade -y` to prerequisites. (4) node check downgraded error→skip (node is optional). (5) **uninstall.sh now undoes the keyboard change** (restores backup or removes the appended block). Verified end-to-end: bash -n both scripts, 3 sandbox scenarios all exit correctly with no stray config, uninstaller undo tested both paths.
-
----
-
-## 🔗 Links
-- OpenCode key: https://opencode.ai/auth
-- Termux (F-Droid): https://f-droid.org/packages/com.termux/
-- Native build source: https://github.com/guysoft/opencode-termux/releases/latest
-- Reference project: https://github.com/guysoft/opencode-termux
-- opencode (the AI agent): https://github.com/anomalyco/opencode
+- [ ] Device-test v2.0.0 on a real ARM64 phone (the only remaining blocker)
+- [ ] Watch `bd-loser/opencode-bionic` — if it goes quiet, the npm fallback
+      becomes primary; consider mirroring the `.deb` to this repo's own releases
+- [ ] Consider a GitHub Action that runs `build-package.sh --check` on every push
+- [ ] Consider re-publishing the zip as a GitHub Release asset instead of a
+      committed binary, so `git clone` stays small
+- [ ] `apiKey: "{env:OPENCODE_API_KEY}"` resolves to an empty string when the key
+      is skipped; verify on-device that this does not shadow a `/connect`
+      credential stored in `auth.json` (left as-is because v1.2 was device-verified
+      with it)
+- [ ] Repo is named `opencode-termux`, colliding with the upstream project it
+      depends on; the product is `opencode-mobile`. Worth renaming.
+- [ ] The folder `opencode for mobile/` still has a space in its name

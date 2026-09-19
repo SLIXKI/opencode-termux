@@ -1,0 +1,22 @@
+# Build staging (build-package.sh assembles the zip here)
+.build/
+
+# Installer runtime artifacts — never belong in the repo
+*.log
+opencode-mobile-install.log
+*.bak
+*.opencode-backup
+*.opencode-uninstall.bak
+opencode-config-backup-*.tar.gz
+opencode-projects-backup-*.tar.gz
+
+# Download cache
+.cache/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
