@@ -1,0 +1,85 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/deepseek-v4-flash-free",
+  "small_model": "opencode/deepseek-v4-flash-free",
+  "provider": {
+    "google": {
+      "options": {
+        "apiKey": "{env:GEMINI_API_KEY}"
+      },
+      "models": {
+        "gemini-3-flash": {
+          "name": "Gemini 3 Flash (Free tier)",
+          "id": "gemini-3-flash",
+          "limit": { "context": 1000000, "output": 65536 }
+        },
+        "gemini-2.5-flash": {
+          "name": "Gemini 2.5 Flash (Free tier)",
+          "id": "gemini-2.5-flash",
+          "limit": { "context": 1000000, "output": 65536 }
+        }
+      }
+    },
+    "openrouter": {
+      "options": {
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      },
+      "models": {
+        "deepseek-chat-free": {
+          "name": "DeepSeek Chat V3 (OpenRouter free)",
+          "id": "deepseek/deepseek-chat-v3-0324:free",
+          "limit": { "context": 64000, "output": 8192 }
+        },
+        "qwen-free": {
+          "name": "Qwen 2.5 72B (OpenRouter free)",
+          "id": "qwen/qwen-2.5-72b-instruct:free",
+          "limit": { "context": 32768, "output": 8192 }
+        }
+      }
+    },
+    "opencode": {
+      "options": {
+        "apiKey": "{env:OPENCODE_API_KEY}",
+        "baseURL": "https://opencode.ai/zen/v1"
+      },
+      "models": {
+        "deepseek-v4-flash-free": {
+          "name": "DeepSeek V4 Flash (OpenCode Zen free)",
+          "id": "deepseek-v4-flash-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "mimo-v2.5-free": {
+          "name": "Mimo V2.5 (OpenCode Zen free)",
+          "id": "mimo-v2.5-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "north-mini-code-free": {
+          "name": "North Mini Code (OpenCode Zen free)",
+          "id": "north-mini-code-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "nemotron-3-ultra-free": {
+          "name": "Nemotron 3 Ultra (OpenCode Zen free)",
+          "id": "nemotron-3-ultra-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "ling-3.0-flash-free": {
+          "name": "Ling 3.0 Flash (OpenCode Zen free)",
+          "id": "ling-3.0-flash-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "laguna-s-2.1-free": {
+          "name": "Laguna S 2.1 (OpenCode Zen free)",
+          "id": "laguna-s-2.1-free",
+          "limit": { "context": 131072, "output": 8192 }
+        },
+        "big-pickle": {
+          "name": "Big Pickle (OpenCode Zen free)",
+          "id": "big-pickle",
+          "limit": { "context": 131072, "output": 8192 }
+        }
+      }
+    }
+  },
+  "instructions": ["~/opencode/AGENTS.md"]
+}

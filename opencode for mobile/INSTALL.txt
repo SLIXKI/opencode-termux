@@ -1,0 +1,81 @@
+====================================================
+  opencode-mobile  —  INSTALL GUIDE (3 minutes)
+  Brought to you by @FeaturisticLeaks X @slixki
+====================================================
+
+Do these 5 steps in order. Copy each command, press
+Enter, let it finish. DO NOT paste two commands at
+once.
+
+------------------------------------------
+STEP 1 — Install Termux (one time only)
+------------------------------------------
+Install the Termux app from F-Droid (NOT Google Play):
+
+    https://f-droid.org/packages/com.termux/
+
+------------------------------------------
+STEP 2 — Give Termux access to your files
+------------------------------------------
+Open Termux, then run:
+
+    termux-setup-storage
+
+When the phone asks for permission, tap ALLOW.
+
+------------------------------------------
+STEP 3 — Put the file in Downloads
+------------------------------------------
+Put the opencode-mobile zip you received into the
+Downloads folder of your phone. (WhatsApp, Drive,
+Bluetooth, cable — any way is fine.)
+
+------------------------------------------
+STEP 4 — Extract, open, install
+------------------------------------------
+In Termux, run these commands ONE at a time:
+
+    cd ~/storage/downloads
+
+    unzip -o opencode-mobile-v1.3.zip
+
+    cd opencode-mobile
+
+    bash install.sh
+
+The zip creates a folder named "opencode-mobile" and puts
+everything inside it — that's the folder you cd into.
+
+(If an OLD copy once left loose files in Downloads with
+no opencode-mobile folder, delete those loose files
+first — they should live INSIDE the opencode-mobile
+folder, not loose in Downloads. In your phone's file
+manager, delete: install.sh, config, README.md,
+GUIDE.md, requirements.txt, INSTALL.txt, uninstall.sh
+then run the unzip command again.)
+
+That's it. The installer does EVERYTHING by itself:
+packages, opencode, free models, memory — nothing to
+press except:
+
+  * if a "tap ALLOW" dialog appears  ->  tap ALLOW
+  * when it asks for your OpenCode key -> paste it
+    (get the free key here: https://opencode.ai/auth
+     Sign in or register -> tap "API key" -> copy)
+
+------------------------------------------
+STEP 5 — Use it (forever)
+------------------------------------------
+Close Termux, open it again, then type:
+
+    AI
+
+That opens opencode. Type what you want to build.
+
+====================================================
+If something goes wrong, just re-run the installer:
+
+    cd ~/storage/downloads/opencode-mobile
+    bash install.sh
+
+====================================================
