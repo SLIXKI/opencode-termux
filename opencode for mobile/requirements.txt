@@ -1,16 +1,20 @@
 # ============================================================
 #  opencode-mobile — prerequisites (Termux / Android)
 # ============================================================
-#  install.sh reads this file and installs every package listed
-#  below, IN ORDER, before it installs opencode itself.
+#  install.sh installs these, in order, before it installs
+#  opencode itself. The one-line installer already contains this
+#  list; this file is the readable reference and is used by the
+#  offline (zip) install path.
 #
-#  One package per line. Lines starting with '#' are comments
-#  and are ignored.
+#  One package per line. Text after '#' is a comment.
 # ============================================================
 
-curl            # downloads the opencode Android build
-unzip           # extracts it
-git             # version control for your projects
-ripgrep         # fast file search used by opencode
-openssh         # secure connections (ssh keys are created during install)
-nodejs-lts      # node + npm (useful for other tools, not required by opencode)
+curl            # downloads opencode (installer also repairs it if broken)
+ca-certificates # HTTPS certificate chain, required for the API and downloads
+coreutils       # sha256sum (checksum verification) and standard text tools
+tar             # extracts archives; also used for config/project backups
+unzip           # extracts zip archives
+git             # REQUIRED for /undo and /redo — they are git-backed
+ripgrep         # opencode's grep tool will not work without it
+nodejs-lts      # node + npm — enables the npm fallback source; not needed by opencode itself
+openssh         # OPTIONAL: git over ssh, ssh into the phone. Nothing creates keys automatically.

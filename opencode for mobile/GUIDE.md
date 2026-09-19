@@ -43,9 +43,10 @@ How to use it:
 - **Type your message** in the box, then press **Enter** to send it.
 - When you send your first message, opencode greets you with
   **"Brought to you by @FeaturisticLeaks X @slixki"** before getting to work —
-  that's automatic, it does it every session.
+  that's automatic, once per session.
 - The AI answers, usually in chunks. **Let it finish.**
-- To **stop** a long or wrong answer, press **`q`** or **Ctrl + C**.
+- To **stop** a long or wrong answer, press **`Esc`**.
+  (Not `q`, and not Ctrl + C — Ctrl + C exits opencode.)
 - To **scroll** up through old messages, use the **arrow keys** — or, in
   Termux, slide your finger on the screen. If you turn on the extra-keys row
   (see "Handy extras" below), you also get Page Up / Page Down buttons.
@@ -96,6 +97,21 @@ cd myapp
 
 Now you're inside the new project's folder.
 
+### Step 4b — Put it under git (one time, five seconds)
+
+```
+git init
+```
+
+`git init` turns the folder into a **git repository** — a folder that remembers
+every change made to it. You do not need to understand git to benefit: this one
+command is what makes opencode's **`/undo`** and **`/redo`** work, so you can
+always step back if the AI makes a mess. Without it, `/undo` silently does
+nothing.
+
+*(The `AI myapp` shortcut and the agent rules both do this for you for new
+projects under `~/opencode/`. This step is here so you know it matters.)*
+
 ### Step 5 — Start opencode
 
 ```
@@ -104,8 +120,9 @@ opencode
 
 The chat window opens. This is where you talk to the AI.
 
-*(If you installed with opencode-mobile, there's an even shorter way: type `AI`
-from anywhere and opencode opens automatically.)*
+*(If you installed with opencode-mobile there is a shorter way. Type **`AI`** to
+open opencode in the folder you are already in, or **`AI myapp`** to create and
+open `~/opencode/myapp` in one step.)*
 
 ### Step 6 — Make your first request
 
@@ -156,8 +173,22 @@ message to the AI. Type `/` and a menu appears showing what's available.
 | `/sessions` | Lists your previous chats. Pick one to resume it, exactly where you left off. |
 | `/models`   | Switches the AI model — the "brain" that answers you. Important for this package. |
 | `/connect`  | Adds or changes an API key / provider (see the API keys section). |
-| `/undo`     | Undoes the last change opencode made to your files. |
+| `/compact`  | Summarises the chat so far to free up memory. **Do this early on a phone** — see the note below. |
+| `/undo`     | Undoes the last change opencode made to your files. **Only works if the project is a git repository.** |
+| `/redo`     | Puts back what `/undo` removed. Also needs git. |
+| `/init`     | Creates or updates an `AGENTS.md` rules file for the current project. |
+| `/export`   | Saves the conversation to a Markdown file. |
 | `/quit`     | Exits opencode. (You can also press Ctrl + D twice.) |
+
+> **Two that matter most on a phone:**
+>
+> - **`/compact`** — free models on a small screen run out of room quickly, and
+>   long sessions are where errors appear most often. Summarise early rather than
+>   waiting for opencode to do it automatically.
+> - **`/undo` needs git.** A folder made with plain `mkdir` has no history to
+>   rewind. When you start a project, run `git init` once inside it — then
+>   `/undo` and `/redo` work, and you can always get back to a known-good state.
+>   opencode will do this for you for new projects under `~/opencode/`.
 
 Think of `/new` as "clear the chat screen" and `/sessions` as "open the history
 book." Neither deletes your actual files — the files live in the project folder,
@@ -168,76 +199,103 @@ not in the chat.
 ## 5. The free models
 
 "Model" is the word for **which AI brain** answers you. Different brains are
-better at different things, and you can switch anytime. This package comes with
-four free models ready to use (and **six more free ones** when you sign in with an
-opencode account — see the "OpenCode Zen" section below):
+better at different things, and you can switch anytime.
 
-| Model name (what you type in `/models`) | The brain behind it |
-|------------------------------------------|---------------------|
-| `google/gemini-3-flash` | **Gemini 3 Flash** — free tier (needs a Google key). |
-| `google/gemini-2.5-flash` | **Gemini 2.5 Flash** — free tier, a lighter Gemini. |
-| `openrouter/deepseek-chat-free` | **DeepSeek Chat V3** — OpenRouter's free listing. |
-| `openrouter/qwen-free` | **Qwen 2.5 72B** — OpenRouter's free listing. |
+### The free models that come pre-configured
 
-(These names come straight from your config file at
-`~/opencode` → `config/opencode.json`.)
+This package is built around **OpenCode Zen** — the AI gateway run by the people
+who make opencode. Nine of its models are free and already configured, so they
+work the moment the install finishes:
+
+| Model name (what you type in `/models`) | The brain behind it | How big |
+|------------------------------------------|---------------------|---------|
+| `opencode/deepseek-v4-flash-free` | DeepSeek V4 Flash — **the default** | 200K context |
+| `opencode/big-pickle` | Big Pickle — a "stealth" model | 200K context |
+| `opencode/mimo-v2.5-free` | MiMo V2.5 (Xiaomi) | 200K context |
+| `opencode/nemotron-3-ultra-free` | Nemotron 3 Ultra (NVIDIA) | **1M context** |
+| `opencode/nemotron-3.5-lightning-free` | Nemotron 3.5 Lightning (NVIDIA) | 262K context |
+| `opencode/north-mini-code-free` | North Mini Code | 256K context |
+| `opencode/ling-3.0-flash-free` | Ling 3.0 Flash | 262K context |
+| `opencode/laguna-s-2.1-free` | Laguna S 2.1 | 256K context |
+| `opencode/hy3-free` | Hy3 | 190K context |
+
+These are pre-configured in your config file at
+**`~/.config/opencode/opencode.json`**.
+
+A key is **optional** — the free models work without one. Adding a free account
+key just raises your rate limits (see below).
+
+> **Which ones are free changes over time.** The free roster rotates with no
+> schedule and no notice, and the `-free` suffix is not a reliable sign
+> (`big-pickle` is free without it). This list is a snapshot from
+> **2026-09-19**. If a model starts erroring with a billing message, it has
+> probably stopped being free — pick another with `/models`. The live list is at
+> `https://opencode.ai/zen/v1/models`.
+
+### Optional extra providers
+
+Two more free sources are wired up but stay dormant until you add a key. You do
+not need to edit any model list — once the key exists, that provider's **whole
+catalogue** appears in `/models` automatically:
+
+| Provider | Set this in `~/.bashrc` | Get a free key |
+|---|---|---|
+| Google Gemini | `export GEMINI_API_KEY="..."` | https://aistudio.google.com/app/apikey |
+| OpenRouter | `export OPENROUTER_API_KEY="..."` | https://openrouter.ai (look for `:free` models) |
+
+These are worth having as a **backup**: when the Zen free tier is rate-limiting
+you, a Gemini or OpenRouter free model is a different pool with different limits.
 
 ### What "free tier" means
 
 Free models are free **in money**, but not unlimited. Providers put **rate
-limits** on them — meaning you can only make so many requests per minute/hour.
-If you send a burst of messages too fast, you might see an error like
-"rate limit reached" or "quota exceeded." That's not a bug, and your work is not
-lost. It just means the free brain is taking a short break.
+limits** on them — you can only make so many requests per minute or hour. Send a
+burst too fast and you may see "rate limit reached" or "quota exceeded". That is
+not a bug and your work is not lost; the free brain is taking a short break.
 
-**Fix:** type `/models` and pick a different model, wait a minute, and continue.
+**Fix:** type `/models`, pick a different model, and continue.
+
+### If you see "1.18.0 or newer is required"
+
+```
+Error from provider (Console): OpenCode 1.18.0 or newer is required to use the free tier
+```
+
+Your opencode is too old for the free models. Run the one-line installer again —
+it updates opencode to the latest version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
+```
+
+Then close Termux completely and reopen it. Full explanation, including why some
+*new* builds still get rejected, is in `docs/TROUBLESHOOTING.md`.
 
 ### Which one should you use?
 
-The package defaults to an OpenCode Zen free model
-(`opencode/deepseek-v4-flash-free`) — it works with the OpenCode key the
-installer asks for. If it starts erroring from rate limits, press `/models` and
-switch to another free model like `opencode/mimo-v2.5-free` or
-`opencode/big-pickle`. The Gemini/DeepSeek/Qwen ones also work if you've added
-those keys. Switching takes five seconds and costs nothing.
+Start with the default, `opencode/deepseek-v4-flash-free`. If it errors from rate
+limits, press `/models` and switch to `opencode/big-pickle` or
+`opencode/mimo-v2.5-free`. For a very large project, `opencode/nemotron-3-ultra-free`
+has a 1M-token context — by far the most room on this list. Switching takes five
+seconds and costs nothing.
 
-### Use OpenCode's own free models (OpenCode Zen)
+### Getting a free key (optional, about 2 minutes)
 
-The people who make opencode also run their own AI gateway called **OpenCode
-Zen**. You sign in with an **opencode account** (no separate key to hunt for) and
-get access to their tested-and-verified models — several of which are **free**:
-
-| Model name (in `/models`) | The brain behind it |
-|----------------------------|---------------------|
-| `opencode/deepseek-v4-flash-free` | DeepSeek V4 Flash |
-| `opencode/mimo-v2.5-free` | Mimo V2.5 |
-| `opencode/nemotron-3-ultra-free` | Nemotron 3 Ultra |
-| `opencode/north-mini-code-free` | North Mini Code |
-| `opencode/ling-3.0-flash-free` | Ling 3.0 Flash |
-| `opencode/laguna-s-2.1-free` | Laguna S 2.1 |
-| `opencode/big-pickle` | Big Pickle |
-
-(These seven are pre-configured in your `config/opencode.json`. After you sign in,
-`/models` may show more models too. Free models are free **for a limited time**
-while the team tunes them, and which ones are free can change — so if a model ever
-starts erroring with a billing message, pick another from the list.)
-
-**How to sign in (about 2 minutes, one time):**
-
-1. Run `opencode`.
-2. Type `/connect`.
-3. Pick **OpenCode Zen**.
-4. Open https://opencode.ai/auth in your browser (or tap the link opencode shows).
-5. Register / sign in, add your billing details, and copy your API key.
-6. Paste the key into opencode when it asks.
-7. Type `/models` — the Zen models now appear. Pick one.
+1. Open https://opencode.ai/auth in your phone's browser.
+2. Register or sign in.
+3. Tap **API key** and copy it.
+4. Either re-run the installer and paste it when asked, or inside opencode type
+   `/connect` → **OpenCode Zen** → paste.
 
 Two honest notes:
 
-- The free Zen models are free **for a limited time** while the team tunes them,
-  and during that free period they may use your conversation data to improve.
-- Sign-up asks for billing details, but you are only charged if you pick a
-  **paid** Zen model. The free ones above stay free.
+- **No card and no billing details are needed.** The free models are free. You
+  are only ever charged if you deliberately pick a *paid* Zen model. (An earlier
+  version of this guide said sign-up asks for billing details — that was wrong.)
+- During a model's free period the provider may use your conversation data to
+  improve it, and NVIDIA's free endpoints are marked "trial use only". **Do not
+  paste passwords, keys or private data into a free model.**
+
 
 ---
 
@@ -247,13 +305,14 @@ A **provider** is the company whose AI you're using (Google, OpenRouter, etc.).
 An **API key** is a secret code that tells the provider "this is me, let me in."
 It's like a password for using the AI service.
 
-Here's the good news: **the only key you really need is the free OpenCode key**
-from https://opencode.ai/auth — the installer asks for it, and it unlocks the 7
-free models that ship with this package. You only add other keys if:
+Here's the good news: **you do not strictly need any key at all.** The 9 free
+OpenCode Zen models work out of the box. A free key from https://opencode.ai/auth
+is worth adding only because it **raises your rate limits** — the installer asks
+for it, and you can press Enter to skip. Add other keys only if:
 
-- you want to use your own provider / paid models, or
+- you want to use your own provider or paid models, or
 - you want the free Google Gemini tier (free to create at Google AI Studio), or
-- you want the free OpenRouter models.
+- you want OpenRouter's free models as a backup when Zen is rate-limiting you.
 
 There are three ways to add a key or provider:
 
@@ -353,6 +412,18 @@ OpenAI-compatible language:
   once. `output` = how long its answers can be. Set numbers that match your
   provider's specs — 128000 context / 8192 output are safe common values.
 
+> **Get these numbers right — they are not just labels.** opencode uses `context`
+> to decide when to summarise the chat (`/compact`), and `output` as the ceiling
+> on how much it may write in one go. Set them too low and two things break:
+> opencode compacts constantly, and **long file writes get cut off mid-file** —
+> which is very visible when it is generating a whole Android project.
+>
+> An earlier version of this package declared 131072/8192 for all nine Zen
+> models. The real values are far larger (up to 1M context and 128K output), so
+> that was truncating work. The config now carries each model's true numbers.
+> For providers opencode already knows about, you can leave `limit` out entirely
+> and it will use the live catalogue values.
+
 After editing, save and restart Termux. Then run `opencode`, type `/models`, and
 your new provider's model should be listed.
 
@@ -382,8 +453,16 @@ off** — even days later.
 - When a project is created, opencode copies a **template** from
   `~/opencode/Memory.template.md` and fills it in with the project's name and
   goal.
-- If you're curious how the AI decides to behave, you can read the rules at
-  `~/.config/opencode/AGENTS.md` and `~/opencode/AGENTS.md`.
+- If you're curious how the AI decides to behave, the rules live in one place:
+  `~/.config/opencode/AGENTS.md`. That is opencode's **global** rules file — it
+  applies to every session on your phone.
+
+> **Memory is only for your own `~/opencode/` projects.** The rules tell opencode
+> *not* to create `Memory.md` inside other people's project trees (an AIDE or
+> AndroidIDE folder, or any existing git repo) unless you ask. Dropping extra
+> files into a repository you did not create can pollute it and get committed by
+> accident. For those projects, use the normal `AGENTS.md` in the project root if
+> you want persistent notes.
 
 ### How to resume work tomorrow
 
@@ -564,7 +643,13 @@ opencode             # (or just run opencode directly)
 ```
 mkdir ~/opencode/myapp
 cd ~/opencode/myapp
+git init               # makes /undo and /redo work
 opencode
+```
+
+**…or in one step**
+```
+AI myapp               # creates ~/opencode/myapp and opens opencode in it
 ```
 
 **Open an existing project**
@@ -593,10 +678,13 @@ cd ~/storage/shared/...  # go into a folder
 | `/sessions` | Resume a past chat |
 | `/models` | Switch AI model |
 | `/connect` | Add/change API key |
-| `/undo` | Undo last change |
+| `/compact` | Summarise the chat to free memory (do it early) |
+| `/undo` | Undo last change (needs `git init` in the project) |
+| `/redo` | Redo after `/undo` (needs git) |
+| `/init` | Create/update the project's AGENTS.md |
 | `/quit` | Exit (or Ctrl+D twice) |
 
-**Stop the AI mid-answer:** press `q` or Ctrl + C.
+**Stop the AI mid-answer:** press **Esc** (not `q`, not Ctrl + C — Ctrl + C exits).
 
 **Memory**
 ```
