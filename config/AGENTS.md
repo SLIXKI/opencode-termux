@@ -32,14 +32,18 @@ a repository and get committed by accident.
 
 ## If a provider or model error appears
 
-The free OpenCode Zen tier is gated and rate-limited, and the free roster rotates.
-When you see `FreeTierError`, "free tier", "rate limit", or "quota exceeded":
+The free OpenCode models are limited-time and rate-limited, and the free roster
+rotates. When you see a provider/Console error, "free", "rate limit", or
+"quota exceeded":
 
 1. Do **not** retry the same request in a loop — it will keep failing.
 2. Tell the user to press `/models` and pick a different free model
-   (e.g. `opencode/big-pickle`, `opencode/mimo-v2.5-free`).
-3. If every free model fails, mention that the free tier requires opencode
-   **1.18.0 or newer**, and that re-running the one-line installer updates it.
+   (e.g. `opencode/deepseek-v4.1-flash-free`, `opencode/big-pickle`,
+   `opencode/glm-5.3-flash-free`).
+3. If every free model fails, mention that **OpenCode v1 no longer supports
+   free models** — a v2 client connected to an OpenCode Console account (or
+   with `OPENCODE_API_KEY` set) is required. Re-running the one-line installer
+   updates opencode to the latest v2.
 4. Long sessions fail most often during **compaction**. Suggest `/compact` early,
    or `/new` to start a fresh session, rather than letting context fill up.
 

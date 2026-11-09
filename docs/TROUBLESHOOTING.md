@@ -5,59 +5,71 @@ beginner help lives in [`../opencode for mobile/GUIDE.md`](../opencode%20for%20m
 
 ---
 
-## "OpenCode 1.18.0 or newer is required to use the free tier"
+## The free models don't appear in `/models`, or every request fails
+
+Since OpenCode 2, the `opencode` provider is **absent** from the model catalog
+until you sign in. If `/models` shows nothing from OpenCode, or every request
+to a free model fails:
+
+1. Sign up (free) at **https://opencode.ai/console/signup**.
+2. Paste the key when the installer asks, or run `/connect` → **OpenCode**
+   inside opencode, or `export OPENCODE_API_KEY=sk-...` in `~/.bashrc`.
+3. Run `/models` again — the free models should now be listed.
+
+The anonymous free tier is gone. Requests from v1 clients or without a
+Console connection are refused.
+
+---
+
+## "OpenCode 1.18.0 or newer is required to use the free tier" (HTTP 426)
+
+Or the sibling message:
 
 ```
-Error from provider (Console): OpenCode 1.18.0 or newer is required to use the free tier
+Error from provider (Console): OpenCode's free tier can only be used from within OpenCode
 ```
 
 ### What is happening
 
-The OpenCode Zen gateway checks the **client version** before serving free-tier
-models, and it has raised that floor over time (1.17.0, then 1.18.0). Older
-clients are refused.
+OpenCode **v1 no longer supports free models**. Upstream pinned the status in
+[issue #59387](https://github.com/anomalyco/opencode/issues/59387): most free-tier
+reports come from OpenCode v1 (0.x / 1.x, e.g. Desktop or CLI 1.19.x), v1 only
+receives fixes for critical bugs, and updating to v2 fixed it for many people.
 
-It does not read the version from your account — it parses it out of the HTTP
-`User-Agent` header that opencode sends, which looks like:
+The error message is misleading — the gateway moved on to v2. The historical
+floor (1.17.0, then 1.18.0) is documented below because the version-string
+rules still apply to any gate like this.
 
-```
-opencode/1.18.31 ai-sdk/provider-utils/4.0.23 runtime/bun/1.4.0
-```
+### The part that still matters: plain release versions
 
-### The part that catches people out
+The free tier reads the client version from the `User-Agent` header and
+requires a **plain release number**. Community and development builds are
+frequently new enough in code but still rejected, because their version string
+is not clean semver:
 
-The version must be a **plain release number**. Community and development builds
-are frequently new enough in code but still rejected, because their version
-string is not clean semver. Verified behaviour against
-`https://opencode.ai/zen/v1/responses`:
-
-| `User-Agent` | HTTP |
+| `User-Agent` | Result (historical v1 gate) |
 |---|---|
-| `opencode/1.18.31` | 200 ✅ |
-| `opencode/1.18.29` | 200 ✅ |
-| `OpenCode/1.18.31` | 200 ✅ (case-insensitive) |
-| `opencode/1.18.31.r12.g88c6c7a` | 403 ❌ git-describe |
-| `opencode/1.18.31-dev.f1aacaba` | 403 ❌ dev build |
-| `opencode/1.18.4-8` | 403 ❌ packaging suffix |
-| `opencode/0.0.0` | 426 ❌ |
-| `opencode/latest` | 403 ❌ not a version |
-| `curl/8.7.1` | 403 ❌ not opencode |
+| `opencode/1.18.31` | ✅ accepted |
+| `opencode/1.18.31.r12.g88c6c7a` | ❌ git-describe |
+| `opencode/1.18.31-dev.f1aacaba` | ❌ dev build |
+| `opencode/1.18.4-8` | ❌ packaging suffix |
+| `opencode/0.0.0` | ❌ |
+| `opencode/latest` | ❌ not a version |
 
 This is why `install.sh` does not stop at "did it install". It runs
 `opencode --version` and requires the result to match `^[0-9]+\.[0-9]+\.[0-9]+$`
-**and** be ≥ 1.18.0. A build that fails either test is discarded and the next
-source is tried.
+**and** be ≥ 2.0.0. A build that fails either test is discarded and the next
+source is tried. Dev builds are never installed.
 
 **Never install a `-dev.` build** expecting the free tier to work. If you pin a
-version with `OPENCODE_VERSION`, pin a clean release like `1.18.31`.
+version with `OPENCODE_VERSION`, pin a clean release like `2.2.6`.
 
 ### There is a second gate
 
-The free tier also requires `x-opencode-session` to be a real opencode session
-ID — the form `ses_` + 12 hex chars + 14 base62 chars. Genuine opencode always
-generates these, so this only matters if you are calling the API from your own
-script or a different agent. Upstream has stated the free tier is not intended
-for third-party harnesses:
+The free tier also requires the session to be a genuine opencode session —
+the request is signed with session IDs only the real client generates.
+Third-party harnesses calling the API directly are refused by design. Upstream
+has stated:
 
 > "We've been tightening our logic to fight abuse. You cannot use the free tier
 > in other harnesses (this is only a limitation for the free tier nothing else)."
@@ -71,72 +83,53 @@ restriction.
 curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
 ```
 
-Then **close Termux completely** (swipe it away) and reopen it, so the new
-binary and your updated `~/.bashrc` are both picked up. Confirm with:
+Then **close Termux completely** (swipe it away) and reopen it. Confirm with:
 
 ```bash
-opencode --version    # must print a clean X.Y.Z, >= 1.18.0
+opencode --version    # must print a clean X.Y.Z, >= 2.0.0
 which opencode
 ```
+
+If you had the npm package `opencode-termux` installed, the installer removes
+it — it shipped v1 only, and it can shadow the v2 binary on `PATH`.
 
 If `opencode --version` still prints something old, a stale binary is shadowing
 the new one — check `which -a opencode` and remove the older path.
 
 ---
 
-## "OpenCode's free tier can only be used from within OpenCode"
+## Free tier errors mid-session (compaction)
 
-Same gate, different wording — you get a 403 `FreeTierError`. Two usual causes:
+In September 2026 a large number of users hit free-tier failures **during
+context compaction** on official builds (1.18.30, 1.18.31, desktop and CLI,
+macOS/Linux/Windows): normal messages succeeded, then compaction failed and
+every later request in that session failed too. It clustered at roughly 70% of
+the context window and was fixed server-side within hours.
 
-1. **A non-release version string** (see the table above).
-2. **A known upstream incident.** In September 2026 a large number of users on
-   *official* builds (1.18.30, 1.18.31, desktop and CLI, macOS/Linux/Windows)
-   hit this simultaneously. It clustered around **context compaction**: normal
-   messages succeeded, then compaction failed and every later request in that
-   session failed too. Several users reported it triggering at roughly **70% of
-   the context window**, and it was fixed server-side within a few hours.
+If you still see this on a current v2 release:
 
-   If every model fails at once for everyone, it is probably not your phone.
-   Wait a while, then start a **fresh session** with `/new` — a poisoned session
-   often keeps failing after the server is fixed.
-
-### Reduce how often you hit it
-
-- **Fix your model limits.** If `limit.context` in `opencode.json` is smaller
-  than the model's real window, opencode compacts far too early — and
-  compaction is exactly where this error bites. The config in this repo now uses
-  the real values (200K–1M depending on model). An older release declared
-  131072 for everything.
-- **`/compact` early and deliberately**, while the session is still small,
-  instead of waiting for auto-compaction at 70%.
-- **`/new` between tasks.** Long-running sessions on a free tier are the worst
-  case.
-- **Switch models** with `/models` — the free roster has several options and
-  their limits are independent.
-- **Avoid custom agents for free-tier work.** There are reproducible reports of
-  a custom primary agent failing on the first request while the built-in `build`
-  and `plan` agents succeed in the same session.
-- **Denied tool permissions** have also been reported as a deterministic
-  trigger. If you added a `permission` block to your config, try removing it.
+- **`/new`** to start a fresh session — a poisoned session often keeps failing
+  after the server is fixed.
+- **`/compact` early and deliberately**, before the context fills, instead of
+  waiting for auto-compaction.
+- **`/models`** → pick another free model; their quotas are independent.
 
 ---
 
 ## Rate limits, quotas, and whether you need a key
 
-Free models are free in money but not unlimited. Expect "rate limit reached" or
-"quota exceeded" if you send a burst of messages.
+Free models are free in money but not unlimited. Expect "rate limit reached"
+or "quota exceeded" if you send a burst of messages.
 
-- The free tier works **anonymously** — `Authorization: Bearer public` is
-  accepted — so a key is not strictly required.
-- A free account key raises your limits. Get one without a card at
-  **https://opencode.ai/auth**. **No billing details are needed** for the free
-  models. (An older version of our guide said sign-up asks for billing details;
-  that was wrong.)
-- Adding balance to a Zen account improves free-tier rate limits, but is
-  entirely optional.
-- During free periods the provider may use your conversation data to improve
-  models. NVIDIA's free endpoints are explicitly "trial use only — do not
-  submit personal or confidential data". Do not paste secrets into a free model.
+- You need a **free OpenCode Console account** — sign up at
+  <https://opencode.ai/console/signup>. The old anonymous free tier is gone.
+- Free models cost nothing; you will not be charged without adding billing.
+- [OpenCode Go](https://opencode.ai/console/go) is a subscription with higher
+  limits — optional, not required.
+- During free periods the provider may use your conversations to improve
+  models; this varies per model (see the privacy notes on the Console models
+  page). NVIDIA's free endpoints are explicitly "trial use only — do not
+  submit personal or confidential data".
 
 When limited: `/models` → pick another free model → continue. Nothing is lost.
 
@@ -144,20 +137,31 @@ When limited: `/models` → pick another free model → continue. Nothing is los
 
 ## The free model roster changes
 
-Which models are free rotates with no schedule and no notice. Models that were
-free have been withdrawn, and the `-free` suffix is **not** a reliable indicator
-(`big-pickle` is free without it).
+Which models are free rotates with no schedule and no notice. `Pulse Alpha
+Free` was deprecated on 2026-11-06, `DeepSeek V4 Flash` on 2026-10-26, and
+models configured in earlier releases of this package (`mimo-v2.5-free`,
+`ling-3.0-flash-free`, `laguna-s-2.1-free`, `hy3-free`,
+`north-mini-code-free`) are gone from the free roster.
 
 If a model in `/models` errors with a billing message, it has probably stopped
-being free. Pick another. The authoritative live list is:
+being free. Pick another. This package intentionally **does not hard-code the
+roster in your config** — opencode pulls the live catalogue, so re-running the
+installer updates the client, not the model list.
 
-```
-https://opencode.ai/zen/v1/models
-```
+Verified free roster snapshot (2026-11-09):
 
-The nine models pre-configured here are a snapshot from **2026-09-19**. To pick
-up changes, edit `config/opencode.json` and re-run the installer — or delete the
-`limit` blocks entirely so opencode takes live values from its model catalogue.
+`deepseek-v4.1-flash-free` · `big-pickle` · `glm-5.3-flash-free` ·
+`mimo-v2.6-flash-free` · `nemotron-3-ultra-free` ·
+`nemotron-3.5-lightning-free` · `nemotron-3.5-super-vl-free` · `iceman-free` ·
+`flint-40b-free` · `beam-free` · `inkling-2-small-free` ·
+`crouton-alpha-free` · `longcat-2.5-free`
+
+(`jev-1.13-free` exists too, but it is a structured-output evaluation model,
+not a coding model, so it is not listed here. Region availability differs —
+see the [Console models page](https://opencode.ai/docs/console/models).)
+
+The authoritative live list is inside opencode itself (`/models`), driven by
+the Console catalog.
 
 ---
 
@@ -174,8 +178,10 @@ up changes, edit `config/opencode.json` and re-run the installer — or delete t
 | `Unsupported architecture` | x86_64 emulator or 32-bit device | not supported — use a real ARM64 phone |
 | Download keeps failing | flaky mobile network | just re-run; the installer resumes partial downloads with `curl -C -` |
 | `checksum mismatch` | corrupt or tampered download | the installer deletes it and refuses to install — re-run |
+| `dpkg` fails to install the `.deb` | broken or very old dpkg | the installer automatically falls back to the raw binary from the same release |
 | Everything is slow | thermal throttling, or a big model on a phone | close other apps, remove the case, or `/models` → a lighter model |
 | opencode installed but will not run | stale shell or a broken library set | fully restart Termux, then `opencode --version` |
+| npm `opencode-termux` still on PATH | stale v1 fallback from an older install | the installer removes it automatically; or `npm uninstall -g opencode-termux` |
 
 ### Getting help
 
@@ -210,5 +216,4 @@ under `~/opencode/` automatically.
 
 Press **Esc**.
 
-Not `q`, and not Ctrl+C — Ctrl+C exits opencode. (An older version of our guide
-said otherwise; that was wrong.)
+Not `q`, and not Ctrl+C — Ctrl+C exits opencode.

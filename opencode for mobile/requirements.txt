@@ -16,5 +16,5 @@ tar             # extracts archives; also used for config/project backups
 unzip           # extracts zip archives
 git             # REQUIRED for /undo and /redo — they are git-backed
 ripgrep         # opencode's grep tool will not work without it
-nodejs-lts      # node + npm — enables the npm fallback source; not needed by opencode itself
+nodejs-lts      # node + npm — not needed by opencode itself; kept for npm-based project tooling
 openssh         # OPTIONAL: git over ssh, ssh into the phone. Nothing creates keys automatically.
