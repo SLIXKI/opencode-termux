@@ -24,13 +24,14 @@ the AI shortcut and the keyboard button.
 The only things you will ever need to do:
 
   * if a "tap ALLOW" dialog appears  ->  tap ALLOW
-  * when it asks for your OpenCode key -> paste it,
-    or just press Enter to skip (free models work
-    without a key; a key only raises your limits)
+  * when it asks for your OpenCode key -> paste it
+    (the free models need a free account — sign up
+    at https://opencode.ai/console/signup first), or
+    press Enter and /connect later
 
-    free key, no card required:
-    https://opencode.ai/auth
-    Sign in or register -> tap "API key" -> copy
+    free key (required for the free models):
+    https://opencode.ai/console/signup
+    Sign up (free) -> copy an API key
 
 It takes a few minutes. Let it finish.
 
@@ -57,14 +58,15 @@ opencode in place and is safe to repeat:
 
     curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
 
-This is also the fix if you ever see:
+This is also the fix if the free models do not
+appear in /models, or you see:
 
-    OpenCode 1.18.0 or newer is required to use
-    the free tier
+    OpenCode 1.18.0 or newer is required
+    to use the free tier
 
-That message means your opencode is too old for the
-free models. Re-running the line above installs the
-latest version.
+That message means your opencode is v1 —
+v1 no longer supports free models. Re-running
+the line above installs the latest v2.
 
 ====================================================
 TO UNINSTALL
@@ -84,7 +86,7 @@ Downloads folder, then run these ONE AT A TIME:
 
     cd ~/storage/downloads
 
-    unzip -o opencode-mobile-v2.0.0.zip
+    unzip -o opencode-mobile-v3.0.0.zip
 
     cd opencode-mobile
 

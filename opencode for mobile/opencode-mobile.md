@@ -1,7 +1,7 @@
 # opencode-mobile — maintainer notes
 
 > **Brought to you by @FeaturisticLeaks X @slixki**
-> Package version: **2.0.0** · Last updated: 2026-09-19
+> Package version: **3.0.0** · Last updated: 2026-11-09
 > User-facing docs: `README.md` (repo root), `INSTALL.txt`, `GUIDE.md`
 > Error reference: `docs/TROUBLESHOOTING.md`
 
@@ -11,7 +11,50 @@ Internal handoff notes. Not part of the distributed zip — users never see this
 
 ## Status
 
-**v2.0.0 — shipped.** Supersedes v1.3.
+**v3.0.0 — shipped 2026-11-09.** Supersedes v2.0.0.
+
+The change that forced this release: **OpenCode v1 no longer supports free
+models.** Per upstream ([anomalyco/opencode#59387](https://github.com/anomalyco/opencode/issues/59387),
+Oct 2026), most free-tier failures come from v1 clients, v1 only gets fixes for
+critical bugs, and updating to v2 fixed it for most people. The latest stable
+upstream is **v2.2.6** (2026-11-09) — exactly what the bionic stable channel
+ships.
+
+A second change: **the anonymous free tier is gone.** Signed out, the `opencode`
+provider is absent from `/models` until you connect a Console account or set
+`OPENCODE_API_KEY`. Signup is free: <https://opencode.ai/console/signup>.
+
+## What changed in v3.0.0
+
+1. **Requires OpenCode v2** — `MIN_OPENCODE` is now `2.0.0`. The clean-semver
+   validation stays; `opencode_version()` was rewritten to tolerate prefixed
+   output (`opencode 2.2.6`, `opencode/2.2.6`) while still rejecting anything
+   with a prerelease/build suffix.
+2. **npm fallback removed.** `opencode-termux` on npm ships v1 only — useless
+   for free models. Replaced by a **raw-binary fallback**: the same release's
+   `opencode` ELF (the `.deb` ships nothing else; verified against
+   `termux/ci/package-deb.sh` upstream) is installed straight into
+   `$PREFIX/bin` when `dpkg` fails. Same SHA256SUMS verification.
+   `purge_legacy_native()` now also removes the v1 npm package so it can't
+   shadow the v2 binary.
+3. **`OPENCODE_SOURCE`** is `auto|bionic|binary` (`npm` warns and falls back
+   to auto).
+4. **`config/opencode.json` rewritten to native V2 schema**: plural `providers`
+   with `settings.apiKey`, `agents.title.model` replaces `small_model`, and —
+   the big one — **the model list is gone entirely**. The roster rotates faster
+   than this package releases; opencode now pulls the live catalogue (models.dev
+   + Console), which also supplies context/output limits (the v2.0.0 limits were
+   already stale). Default model: `opencode/deepseek-v4.1-flash-free`;
+   title model: `opencode/big-pickle`.
+5. **Console account required for free models** — docs, installer prompt and
+   AGENTS.md all say so now; signup link is <https://opencode.ai/console/signup>.
+6. The free roster in the docs was refreshed to the 2026-11-09 snapshot
+   (13 coding-suitable free models; `jev-1.13-free` excluded as a
+   structured-output model, not a chat model).
+7. `AGENTS.md` says "OpenCode v2 required, v1 no longer supports free models"
+   instead of "1.18.0 or newer", and the example models were updated.
+
+### v2.0.0 notes (historical)
 
 The change that forced this release: the OpenCode Zen gateway raised its minimum
 client version to **1.18.0**, and the only Termux build this package used
@@ -235,18 +278,23 @@ of truth**; regenerate with `./build-package.sh`, verify with
 `./build-package.sh --check`. Never hand-edit the embedded block.
 
 ### Env overrides
-`OPENCODE_VERSION` · `OPENCODE_SOURCE=auto|bionic|npm` · `OPENCODE_API_KEY` ·
+`OPENCODE_VERSION` · `OPENCODE_SOURCE=auto|bionic|binary` · `OPENCODE_API_KEY` ·
 `OPENCODE_MOBILE_YES=1` · `OPENCODE_MOBILE_NO_KEYBOARD=1` ·
 `OPENCODE_MOBILE_DELETE_PROJECTS=1` / `_DELETE_DATA=1` (uninstall)
 
 ### Upstream
-- opencode: `anomalyco/opencode` — v1.18.31 at time of writing; **v2 announced**
-- Bionic builds: `bd-loser/opencode-bionic` — stable + daily `-dev.` prereleases
-- musl repackaging: `C04-wq/opencode-termux` — npm, 6-hourly
+- opencode: `anomalyco/opencode` — **v2.2.6** (2026-11-09, current stable)
+- Bionic builds: `bd-loser/opencode-bionic` — stable v2 line + `-dev.` prereleases
+- Official v2 via npm: `@opencode/cli` (linux-arm64 + musl) — **not used**: the
+  postinstall only runs `--version`, so a broken-on-Bionic glibc binary would
+  pass; the npm musl build may also lack working DNS. Revisit if a v2-capable
+  Termux-specific npm package appears.
+- musl repackaging: `C04-wq/opencode-termux` — v1 only (1.19.3); retired here
 - Original cross-compile: `guysoft/opencode-termux` — **stale at 1.17.9**
-- Zen free tier floor: **1.18.0**, clean semver in `User-Agent`, valid `ses_` session ID
-- Live free-model list: `https://opencode.ai/zen/v1/models`
-- Free-tier key (no card): `https://opencode.ai/auth`
+- Free models: require a **free Console account**; roster rotates; see
+  <https://opencode.ai/docs/console/models> (snapshot 2026-11-09 in
+  TROUBLESHOOTING.md); `OPENCODE_DISABLE_FREE_MODELS=1` hides them
+- Free-tier key: <https://opencode.ai/console/signup>
 
 ### Known upstream instability (September 2026)
 `anomalyco/opencode#49433` (45 comments) — a wave of `FreeTierError` on
@@ -258,9 +306,9 @@ agents failing where built-in `build`/`plan` succeed, and denied tool permission
 as a deterministic trigger.
 
 This is **not** something the package can fix, so the config and rules are tuned
-to reduce exposure: correct (larger) context limits mean fewer compactions, and
-`AGENTS.md` tells the agent not to retry-loop and to suggest `/compact` early or
-`/new`.
+to reduce exposure: the model list is catalogue-driven (no stale limits to
+mis-time compaction), and `AGENTS.md` tells the agent not to retry-loop and to
+suggest `/compact` early or `/new`.
 
 ---
 
@@ -288,16 +336,19 @@ between "verified in sandbox" and "share widely" — same as it was for v1.3.
 
 ## Open items
 
-- [ ] Device-test v2.0.0 on a real ARM64 phone (the only remaining blocker)
-- [ ] Watch `bd-loser/opencode-bionic` — if it goes quiet, the npm fallback
-      becomes primary; consider mirroring the `.deb` to this repo's own releases
+- [ ] Device-test v3.0.0 on a real ARM64 phone (the only remaining blocker)
+- [ ] Watch `bd-loser/opencode-bionic` — if it goes quiet, there is no packaged v2
+      source left; consider mirroring the `.deb` to this repo's own releases
 - [ ] Consider a GitHub Action that runs `build-package.sh --check` on every push
 - [ ] Consider re-publishing the zip as a GitHub Release asset instead of a
       committed binary, so `git clone` stays small
-- [ ] `apiKey: "{env:OPENCODE_API_KEY}"` resolves to an empty string when the key
-      is skipped; verify on-device that this does not shadow a `/connect`
-      credential stored in `auth.json` (left as-is because v1.2 was device-verified
-      with it)
+- [ ] `OPENCODE_API_KEY` empty-when-skipped: the v2 config no longer references
+      the env var (the built-in provider reads it natively), so the old empty-
+      string concern is gone — but verify on-device that a `/connect` credential
+      and an exported `OPENCODE_API_KEY` don't fight each other
+- [ ] Confirm what `opencode --version` prints on the bionic v2 build on-device;
+      `opencode_version()` accepts bare and prefixed forms, but only a device
+      will show the true shape
 - [ ] Repo is named `opencode-termux`, colliding with the upstream project it
       depends on; the product is `opencode-mobile`. Worth renaming.
 - [ ] The folder `opencode for mobile/` still has a space in its name

@@ -39,21 +39,26 @@ otherwise.
 
 ---
 
-## Fixing "OpenCode 1.18.0 or newer is required"
+## Fixing free-model errors
+
+OpenCode **v1 no longer supports free models**. If you see
 
 ```
 Error from provider (Console): OpenCode 1.18.0 or newer is required to use the free tier
 ```
 
-Your opencode is older than the free tier now allows. Run the one-line installer
-again — it installs the latest stable version, then **checks the version string
-the binary actually reports** and rejects builds the free tier would refuse.
+or the free models are missing from `/models`, you are on v1 or you are not
+connected to a Console account. Run the one-line installer again — it installs
+the latest v2 and **checks the version string the binary actually reports**.
+Then sign in: free models need a free account at
+<https://opencode.ai/console/signup> (paste the key when asked, or `/connect`
+inside opencode).
 
-That last part matters. The gateway reads the version from the client's
+That first check matters. The gateway reads the version from the client's
 `User-Agent` and requires a plain release number, so builds like
-`1.18.31-dev.f1aacaba` or `1.18.4-8` are rejected *even though the code is new
-enough*. This installer refuses to install those. Full details, including the
-September 2026 upstream compaction incident, are in `docs/TROUBLESHOOTING.md`.
+`2.2.6-dev.f1aacaba` or `2.2.6-8` are rejected *even though the code is new
+enough*. This installer refuses to install those. Full details are in
+`docs/TROUBLESHOOTING.md`.
 
 ---
 
@@ -62,6 +67,7 @@ September 2026 upstream compaction incident, are in `docs/TROUBLESHOOTING.md`.
 - An Android phone — **64-bit ARM (ARM64 / aarch64)**. Most phones made since ~2018.
 - **Termux from F-Droid** — <https://f-droid.org/packages/com.termux/>.
   The Google Play version is outdated and will not work.
+- A **free OpenCode Console account** — <https://opencode.ai/console/signup>.
 - About 250 MB of free storage, and an internet connection.
 
 > ⚠️ **Which devices work:** opencode for Termux is **aarch64-only**. It does
@@ -75,20 +81,22 @@ No computer, no coding experience, no paid subscriptions.
 
 ## Free models
 
-Nine free OpenCode Zen models are pre-configured — **no key and no card
-required**. Default is `opencode/deepseek-v4-flash-free`. When one is
-rate-limited, press `/models` and switch:
+A free OpenCode Console account is required — the anonymous free tier is gone.
+Sign up free at <https://opencode.ai/console/signup>, then paste the key when
+the installer asks (or `/connect` later). Default model is
+`opencode/deepseek-v4.1-flash-free`. When one is rate-limited, press `/models`
+and switch. As of 2026-11 the free roster includes:
 
-`deepseek-v4-flash-free` · `big-pickle` · `mimo-v2.5-free` ·
-`nemotron-3-ultra-free` (1M context) · `nemotron-3.5-lightning-free` ·
-`north-mini-code-free` · `ling-3.0-flash-free` · `laguna-s-2.1-free` · `hy3-free`
+`deepseek-v4.1-flash-free` · `big-pickle` · `glm-5.3-flash-free` ·
+`mimo-v2.6-flash-free` · `nemotron-3-ultra-free` ·
+`nemotron-3.5-lightning-free` · `nemotron-3.5-super-vl-free` · `iceman-free` ·
+`flint-40b-free` · `beam-free` · `inkling-2-small-free` ·
+`crouton-alpha-free` · `longcat-2.5-free`
 
-Adding a free key from <https://opencode.ai/auth> raises your rate limits.
-Google Gemini and OpenRouter free tiers work too as backups — export
-`GEMINI_API_KEY` or `OPENROUTER_API_KEY` and their catalogues appear automatically.
-
-The free roster **rotates without notice**; this list is a snapshot from
-2026-09-19. Live list: `https://opencode.ai/zen/v1/models`.
+The roster **rotates without notice**, so it is not baked into the config —
+opencode pulls the live catalogue. Region availability varies. The live list is
+`/models` inside opencode. Google Gemini and OpenRouter work too as backups —
+run `/connect` inside opencode and add them.
 
 ---
 
@@ -108,8 +116,8 @@ The free roster **rotates without notice**; this list is a snapshot from
 
 | Problem | Fix |
 |---|---|
-| `1.18.0 or newer is required` | Re-run the one-line installer, then fully restart Termux. |
-| `free tier can only be used from within OpenCode` | Switch model with `/models`; on long chats `/new` for a fresh session. May be an upstream incident — see troubleshooting. |
+| Free models missing from `/models` | Sign in — v2 needs a Console account. `/connect` → **OpenCode**, or re-run the installer and paste your key. |
+| `free tier can only be used from within OpenCode` | You are on v1, or not signed in. Re-run the installer (it now installs v2), then sign in and restart Termux. |
 | Rate limit / quota exceeded | `/models` → pick another free model. Nothing is lost. |
 | Commands got jumbled (`-ypkg`, `unzipunzip`) | Type **one command per line**, pressing Enter after each. |
 | `command not found: AI` | Close Termux completely and reopen, or `source ~/.bashrc`. |
@@ -133,7 +141,7 @@ If you were sent the zip instead:
    ```bash
    termux-setup-storage
    cd ~/storage/downloads
-   unzip -o opencode-mobile-v2.0.0.zip
+   unzip -o opencode-mobile-v3.0.0.zip
    cd opencode-mobile
    bash install.sh
    ```

@@ -32,7 +32,7 @@ under its own licence:
 
   * opencode            https://github.com/anomalyco/opencode
   * opencode-bionic     https://github.com/bd-loser/opencode-bionic      (MIT)
-  * opencode-termux     https://github.com/C04-wq/opencode-termux        (MIT)
-  * opencode-termux     https://github.com/guysoft/opencode-termux
+  * opencode-termux     https://github.com/C04-wq/opencode-termux        (MIT, fallback through v2.0.0 of this package; no longer installed)
+  * opencode-termux     https://github.com/guysoft/opencode-termux       (original cross-compile; no longer installed)
 
 Review those licences before redistributing any downloaded binaries.

@@ -201,36 +201,47 @@ not in the chat.
 "Model" is the word for **which AI brain** answers you. Different brains are
 better at different things, and you can switch anytime.
 
-### The free models that come pre-configured
+### The free models
 
-This package is built around **OpenCode Zen** — the AI gateway run by the people
-who make opencode. Nine of its models are free and already configured, so they
-work the moment the install finishes:
+This package is built around **OpenCode Console** — the model gateway run by the
+people who make opencode. A set of its models is free for a limited time and
+works inside opencode once you are signed in.
 
-| Model name (what you type in `/models`) | The brain behind it | How big |
-|------------------------------------------|---------------------|---------|
-| `opencode/deepseek-v4-flash-free` | DeepSeek V4 Flash — **the default** | 200K context |
-| `opencode/big-pickle` | Big Pickle — a "stealth" model | 200K context |
-| `opencode/mimo-v2.5-free` | MiMo V2.5 (Xiaomi) | 200K context |
-| `opencode/nemotron-3-ultra-free` | Nemotron 3 Ultra (NVIDIA) | **1M context** |
-| `opencode/nemotron-3.5-lightning-free` | Nemotron 3.5 Lightning (NVIDIA) | 262K context |
-| `opencode/north-mini-code-free` | North Mini Code | 256K context |
-| `opencode/ling-3.0-flash-free` | Ling 3.0 Flash | 262K context |
-| `opencode/laguna-s-2.1-free` | Laguna S 2.1 | 256K context |
-| `opencode/hy3-free` | Hy3 | 190K context |
+**Since OpenCode 2, signing in is required for the free models.** The old
+anonymous access is gone: signed out, the OpenCode provider is absent from
+`/models`. A free account is all you need — sign up at
+**https://opencode.ai/console/signup** and paste the API key when the installer
+asks (or run `/connect` later). No card is required for the free models.
 
-These are pre-configured in your config file at
-**`~/.config/opencode/opencode.json`**.
+As of **November 2026** the free roster includes (verify with `/models` — it
+rotates without notice):
 
-A key is **optional** — the free models work without one. Adding a free account
-key just raises your rate limits (see below).
+| Model name (what you type in `/models`) | The brain behind it |
+|------------------------------------------|---------------------|
+| `opencode/deepseek-v4.1-flash-free` | DeepSeek V4.1 Flash — **the default** |
+| `opencode/big-pickle` | Big Pickle — a "stealth" model |
+| `opencode/glm-5.3-flash-free` | GLM-5.3 Flash (Z.ai) |
+| `opencode/mimo-v2.6-flash-free` | MiMo V2.6 Flash (Xiaomi) |
+| `opencode/nemotron-3-ultra-free` | Nemotron 3 Ultra (NVIDIA) |
+| `opencode/nemotron-3.5-lightning-free` | Nemotron 3.5 Lightning (NVIDIA) |
+| `opencode/nemotron-3.5-super-vl-free` | Nemotron 3.5 Super VL (NVIDIA) |
+| `opencode/iceman-free` | Iceman — a "stealth" model |
+| `opencode/flint-40b-free` | Flint 40B |
+| `opencode/beam-free` | Beam |
+| `opencode/inkling-2-small-free` | Inkling 2 Small (not available in the EU or some countries) |
+| `opencode/crouton-alpha-free` | Crouton Alpha (not available in the EU, China and more) |
+| `opencode/longcat-2.5-free` | LongCat 2.5 (hosted in China, 100 requests/day) |
 
-> **Which ones are free changes over time.** The free roster rotates with no
-> schedule and no notice, and the `-free` suffix is not a reliable sign
-> (`big-pickle` is free without it). This list is a snapshot from
-> **2026-09-19**. If a model starts erroring with a billing message, it has
-> probably stopped being free — pick another with `/models`. The live list is at
-> `https://opencode.ai/zen/v1/models`.
+The list of free models is **not** baked into your config — opencode pulls the
+live catalogue itself, so `/models` always shows what is actually free today.
+Context and output limits come from that catalogue too.
+
+> **Which ones are free changes over time.** `big-pickle` is free without the
+> `-free` suffix, and models disappear with no notice (five models configured
+> in the previous version of this guide are gone). This list is a snapshot from
+> **2026-11-09**. If a model starts erroring with a billing message, it has
+> probably stopped being free — pick another with `/models`. The live list is
+> always `/models` itself, driven by the Console catalog.
 
 ### Optional extra providers
 
@@ -243,8 +254,9 @@ catalogue** appears in `/models` automatically:
 | Google Gemini | `export GEMINI_API_KEY="..."` | https://aistudio.google.com/app/apikey |
 | OpenRouter | `export OPENROUTER_API_KEY="..."` | https://openrouter.ai (look for `:free` models) |
 
-These are worth having as a **backup**: when the Zen free tier is rate-limiting
-you, a Gemini or OpenRouter free model is a different pool with different limits.
+These are worth having as a **backup**: when the Console free models are
+rate-limited, a Gemini or OpenRouter free model is a different pool with
+different limits.
 
 ### What "free tier" means
 
@@ -255,47 +267,52 @@ not a bug and your work is not lost; the free brain is taking a short break.
 
 **Fix:** type `/models`, pick a different model, and continue.
 
-### If you see "1.18.0 or newer is required"
+### If the free models don't appear, or every request fails
 
-```
-Error from provider (Console): OpenCode 1.18.0 or newer is required to use the free tier
-```
+Since OpenCode 2, the free models need a free Console account. If `/models`
+shows no OpenCode models, or every request errors:
 
-Your opencode is too old for the free models. Run the one-line installer again —
-it updates opencode to the latest version:
+1. Sign up (free) at **https://opencode.ai/console/signup**.
+2. Paste the key when the installer asks, or inside opencode run
+   `/connect` → **OpenCode** and paste it.
+3. Run `/models` again — the free models should now be listed.
+
+If you see `OpenCode 1.18.0 or newer is required to use the free tier`, your
+client is too old — OpenCode **v1 no longer supports free models** at all.
+Run the one-line installer again; it installs the latest v2:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
 ```
 
-Then close Termux completely and reopen it. Full explanation, including why some
-*new* builds still get rejected, is in `docs/TROUBLESHOOTING.md`.
+Then close Termux completely and reopen it. More detail is in
+`docs/TROUBLESHOOTING.md` in the repository.
 
 ### Which one should you use?
 
-Start with the default, `opencode/deepseek-v4-flash-free`. If it errors from rate
+Start with the default, `opencode/deepseek-v4.1-flash-free`. If it errors from rate
 limits, press `/models` and switch to `opencode/big-pickle` or
-`opencode/mimo-v2.5-free`. For a very large project, `opencode/nemotron-3-ultra-free`
-has a 1M-token context — by far the most room on this list. Switching takes five
-seconds and costs nothing.
+`opencode/glm-5.3-flash-free`. For a very large project, `opencode/nemotron-3-ultra-free`
+is NVIDIA's biggest free option — by far the most room on this list. Switching takes
+five seconds and costs nothing.
 
-### Getting a free key (optional, about 2 minutes)
+### Getting a free key (required for the free models, about 2 minutes)
 
-1. Open https://opencode.ai/auth in your phone's browser.
-2. Register or sign in.
-3. Tap **API key** and copy it.
+1. Open https://opencode.ai/console/signup in your phone's browser.
+2. Register or sign in — it's free.
+3. Copy an **API key** from the Console (Keys section).
 4. Either re-run the installer and paste it when asked, or inside opencode type
-   `/connect` → **OpenCode Zen** → paste.
+   `/connect` → **OpenCode** → paste.
 
 Two honest notes:
 
-- **No card and no billing details are needed.** The free models are free. You
-  are only ever charged if you deliberately pick a *paid* Zen model. (An earlier
-  version of this guide said sign-up asks for billing details — that was wrong.)
+- **No card is needed for the free models.** You are only ever charged if you
+  deliberately add billing and pick a *paid* model. Higher free limits are
+  available through [OpenCode Go](https://opencode.ai/console/go), a subscription
+  — optional, never required.
 - During a model's free period the provider may use your conversation data to
   improve it, and NVIDIA's free endpoints are marked "trial use only". **Do not
   paste passwords, keys or private data into a free model.**
-
 
 ---
 
@@ -305,21 +322,21 @@ A **provider** is the company whose AI you're using (Google, OpenRouter, etc.).
 An **API key** is a secret code that tells the provider "this is me, let me in."
 It's like a password for using the AI service.
 
-Here's the good news: **you do not strictly need any key at all.** The 9 free
-OpenCode Zen models work out of the box. A free key from https://opencode.ai/auth
-is worth adding only because it **raises your rate limits** — the installer asks
-for it, and you can press Enter to skip. Add other keys only if:
+Here's the deal: **the free models need a free OpenCode Console account.** The
+installer asks for a key (you can get one from https://opencode.ai/console/signup);
+pressing Enter skips it, but then the free models won't appear until you run
+`/connect` → **OpenCode** with your key. Add other keys only if:
 
 - you want to use your own provider or paid models, or
 - you want the free Google Gemini tier (free to create at Google AI Studio), or
-- you want OpenRouter's free models as a backup when Zen is rate-limiting you.
+- you want OpenRouter's free models as a backup when the free tier is rate-limited.
 
 There are three ways to add a key or provider:
 
 ### Way 1 — The easiest: `/connect` inside opencode
 
 When you installed the package, the installer (`install.sh`) asked for your free
-OpenCode key — that's optional. You can add or change a key anytime later:
+OpenCode key. You can add or change a key anytime later:
 
 1. Run `opencode`.
 2. Type `/connect`.
@@ -347,7 +364,7 @@ export OPENROUTER_API_KEY="sk-or-..."
 3. Save, exit, and **restart Termux** (swipe the app away and reopen it).
    The variable is now active.
 
-For OpenCode Zen, the installer already exported your key for you as
+For OpenCode, the installer already exported your key for you as
 `OPENCODE_API_KEY` in `~/.bashrc` — you don't need to do anything.
 
 ### Way 3 — Edit the config file directly
@@ -366,18 +383,18 @@ OpenAI-compatible language:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
+  "providers": {
     "myprovider": {
-      "npm": "@ai-sdk/openai-compatible",
+      "package": "aisdk:@ai-sdk/openai-compatible",
       "name": "My Provider",
-      "options": {
+      "settings": {
         "baseURL": "https://api.myprovider.com/v1",
         "apiKey": "{env:MY_API_KEY}"
       },
       "models": {
         "my-model": {
           "name": "My Model",
-          "id": "my-model-id",
+          "modelID": "my-model-id",
           "limit": { "context": 128000, "output": 8192 }
         }
       }
@@ -390,15 +407,15 @@ OpenAI-compatible language:
 
 - **`$schema`** — a note saying "this file follows the official opencode format."
   It just helps editors check your file. Leave it alone.
-- **`provider`** — the list of AI services you can use. You're adding one new
-  entry to this list.
+- **`providers`** — the list of AI services opencode knows about. You're adding
+  one new entry to this list.
 - **`"myprovider"`** — the name *you* invent for this provider. Use it in
   `/models` and `/connect`. Pick something short.
-- **`npm`** — the software "adapter" opencode uses to talk to this kind of
-  provider. `@ai-sdk/openai-compatible` means "this provider speaks the same
-  language as OpenAI, so use the standard adapter." Most modern services do.
+- **`package`** — the software "adapter" opencode uses to talk to this kind of
+  provider. `aisdk:@ai-sdk/openai-compatible` means "this provider speaks the
+  same language as OpenAI, so use the standard adapter." Most modern services do.
 - **`name`** — a friendly display name shown in the menu.
-- **`options`** — the connection settings for this provider.
+- **`settings`** — the connection settings for this provider.
 - **`baseURL`** — the web address of the provider's API — where requests get
   sent. Your provider's docs will give you the exact URL.
 - **`apiKey`** — the key. `{env:MY_API_KEY}` means "read the key from an
@@ -406,7 +423,7 @@ OpenAI-compatible language:
   writing your actual key in this file.
 - **`models`** — the list of models this provider offers.
 - **`"my-model"`** — the name *you* choose for this model inside opencode.
-- **`id`** — the exact model code the provider uses (from their docs).
+- **`modelID`** — the exact model code the provider uses (from their docs).
 - **`limit`** — how big this model's "brain" is, measured in tokens (roughly,
   pieces of text). `context` = how much of your conversation it can remember at
   once. `output` = how long its answers can be. Set numbers that match your
@@ -418,11 +435,11 @@ OpenAI-compatible language:
 > opencode compacts constantly, and **long file writes get cut off mid-file** —
 > which is very visible when it is generating a whole Android project.
 >
-> An earlier version of this package declared 131072/8192 for all nine Zen
-> models. The real values are far larger (up to 1M context and 128K output), so
-> that was truncating work. The config now carries each model's true numbers.
-> For providers opencode already knows about, you can leave `limit` out entirely
-> and it will use the live catalogue values.
+> An earlier version of this package declared 131072/8192 for all the free
+> models, which truncated work. This package no longer hard-codes limits at all —
+> for providers opencode knows about, limits come from the live catalogue, so you
+> can leave `limit` out entirely. Only custom providers like the one above need
+> them spelled out.
 
 After editing, save and restart Termux. Then run `opencode`, type `/models`, and
 your new provider's model should be listed.

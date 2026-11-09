@@ -8,24 +8,26 @@
 #
 #    curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash
 #
-#  Installs opencode (latest stable, >= 1.18.0), its prerequisites, the
+#  Installs opencode v2 (latest stable), its prerequisites, the
 #  free-model config, the memory system, the `AI` shortcut and the Termux
 #  keyboard (⌨) toggle button. Safe to re-run; it updates in place.
+#
+#  Note: OpenCode v1 no longer supports free models (upstream, Oct 2026),
+#  so this installer requires v2.
 #
 #  Brought to you by @FeaturisticLeaks X @slixki
 #
 # ── Environment overrides (all optional) ─────────────────────────
-#   OPENCODE_VERSION=1.18.31     pin an exact opencode version
-#   OPENCODE_SOURCE=auto         auto | bionic | npm   (default auto)
-#   OPENCODE_API_KEY=sk-...      supply the Zen key non-interactively
+#   OPENCODE_VERSION=2.2.6     pin an exact opencode version
+#   OPENCODE_SOURCE=auto       auto | bionic | binary   (default auto)
+#   OPENCODE_API_KEY=sk-...    supply your Console key non-interactively
 #   OPENCODE_MOBILE_YES=1        never prompt (assume default answers)
 #   OPENCODE_MOBILE_NO_KEYBOARD=1  do not touch termux.properties
 # ──────────────────────────────────────────────────────────────────
 
-PACKAGE_VERSION="2.0.0"
-MIN_OPENCODE="1.18.0"   # the Zen free tier rejects anything older
+PACKAGE_VERSION="3.0.0"
+MIN_OPENCODE="2.0.0"   # v1 no longer supports free models (upstream: v2 fixes it)
 BIONIC_REPO="bd-loser/opencode-bionic"
-NPM_FALLBACK_PKG="opencode-termux"
 
 # Never `set -e`: every failure below is handled explicitly, and a bare
 # exit in the middle would leave the phone half-configured.
@@ -84,10 +86,10 @@ ver_ge() {
   return 0
 }
 
-# A clean release version is exactly X.Y.Z. The Zen free-tier gate parses
-# the version out of the client User-Agent and REJECTS anything that is
-# not a plain release string — `1.18.31-dev.f1aacaba`, `1.18.31.r12.g88c6c7a`
-# and `1.18.4-8` all fail with a FreeTierError even though the code is new
+# A clean release version is exactly X.Y.Z. The free tier reads the client
+# version out of the User-Agent header and REJECTS anything that is not a
+# plain release string — `2.2.6-dev.f1aacaba`, `2.2.6.r12.g88c6c7a` and
+# `2.2.7-8` all fail with a FreeTierError even though the code is new
 # enough. So we validate the string, not just the number.
 is_clean_semver() { printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; }
 
@@ -179,7 +181,7 @@ pkg update -y >>"$LOG_FILE" 2>&1 && ok "package list updated" || warn "pkg updat
 # ripgrep  — opencode's grep tool needs it
 # git      — /undo and /redo are git-backed, so projects need it
 # curl, ca-certificates, coreutils, tar, unzip — download + verify + extract
-# nodejs-lts — optional, but enables the npm fallback source and general use
+# nodejs-lts — not needed by opencode itself; kept for npm-based project tooling
 # openssh    — git over ssh (optional)
 PREREQS="curl ca-certificates coreutils tar unzip git ripgrep nodejs-lts openssh"
 info "Installing: $PREREQS"
@@ -215,12 +217,36 @@ fi
 # ══════════════════════════════════════════════════════════════════
 #  3. Install opencode
 # ══════════════════════════════════════════════════════════════════
-step "3/9  Installing opencode (latest stable)"
+step "3/9  Installing opencode v2 (latest stable)"
 
 CACHE="$HOME/.cache/opencode-mobile"
 mkdir -p "$CACHE"
 
-opencode_version() { opencode --version 2>/dev/null | head -n1 | tr -d '\r'; }
+# Extract a clean X.Y.Z from `opencode --version`. Accepts a bare version
+# ("2.2.6") and the two common prefixed forms ("opencode 2.2.6",
+# "opencode v2.2.6", "opencode/2.2.6"). Anything carrying a prerelease or
+# build suffix ("2.2.6-dev.abc", "2.2.6 (dc2ffcf8)") yields nothing usable,
+# which version_acceptable() then rejects — the free tier refuses those.
+opencode_version() {
+  local line rest
+  line="$(opencode --version 2>/dev/null | head -n1 | tr -d '\r')"
+  # trim leading/trailing whitespace
+  line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
+  # strip a leading 'v'
+  line="${line#v}"
+  case "$line" in
+    *.*.*) : ;;                 # has at least X.Y.Z shape; validate strictly later
+    *) return 1 ;;
+  esac
+  case "$line" in
+    *[[:space:]]*|*/*)
+      # take the last whitespace/slash-separated token
+      rest="${line##*[[:space:]/]}"
+      rest="${rest#v}"
+      printf '%s' "$rest" ;;
+    *) printf '%s' "$line" ;;
+  esac
+}
 
 # Accept only a clean release string that is >= MIN_OPENCODE.
 version_acceptable() {
@@ -228,31 +254,45 @@ version_acceptable() {
   [ -n "$v" ] || return 1
   if ! is_clean_semver "$v"; then
     warn "version string '$v' is not a plain release number."
-    info "The Zen free tier reads the version from the client User-Agent and"
+    info "The free tier reads the version from the client User-Agent and"
     info "rejects dev/git-suffixed builds, so this one would still fail."
     return 1
   fi
   if ! ver_ge "$v" "$MIN_OPENCODE"; then
     warn "opencode $v is older than $MIN_OPENCODE."
-    info "The Zen free tier requires $MIN_OPENCODE or newer."
+    info "OpenCode v1 no longer supports free models — v2 is required."
     return 1
   fi
   return 0
 }
 
 # Remove leftovers from the old guysoft/opencode-termux layout (a ~180 MB binary
-# under $PREFIX/libexec plus three .so files). Without this they waste storage.
+# under $PREFIX/libexec plus three .so files) and from the retired npm
+# fallback (opencode-termux — v1-only, and v1 no longer supports free models).
+# Without this they waste storage or shadow the v2 binary on PATH.
 #
 # Only ever called AFTER a new opencode has been installed AND validated.
 # Purging first would mean a failed download leaves the user with no opencode at
 # all, rather than the older build they started with.
 purge_legacy_native() {
-  [ -e "$PREFIX/libexec/opencode/opencode.bin" ] || return 0
-  info "Removing the previous native build (frees ~180 MB)..."
-  rm -rf "$PREFIX/libexec/opencode" 2>/dev/null
-  rm -f  "$PREFIX/lib/libtagfix.so" "$PREFIX/lib/libc++_shared.so" \
-         "$PREFIX/lib/libopentui.so" 2>/dev/null
-  ok "previous native build removed"
+  local removed=false
+  if [ -e "$PREFIX/libexec/opencode/opencode.bin" ]; then
+    info "Removing the previous native build (frees ~180 MB)..."
+    rm -rf "$PREFIX/libexec/opencode" 2>/dev/null
+    rm -f  "$PREFIX/lib/libtagfix.so" "$PREFIX/lib/libc++_shared.so" \
+           "$PREFIX/lib/libopentui.so" 2>/dev/null
+    ok "previous native build removed"; removed=true
+  fi
+  if command -v npm >/dev/null 2>&1 \
+     && npm ls -g --depth=0 2>/dev/null | grep -q 'opencode-termux'; then
+    info "Removing the retired npm package 'opencode-termux' (v1 — no free models)..."
+    if npm uninstall -g opencode-termux >>"$LOG_FILE" 2>&1; then
+      ok "retired npm package removed"; removed=true
+    else
+      warn "could not remove 'opencode-termux' — remove it by hand: npm uninstall -g opencode-termux"
+    fi
+  fi
+  [ "$removed" = false ] && return 0
 }
 
 # ── Source A: bd-loser/opencode-bionic — native Bionic .deb, built from
@@ -335,18 +375,64 @@ install_from_bionic() {
   ok "installed to $(command -v opencode)"
 }
 
-# ── Source B: C04-wq/opencode-termux via npm — repackages the OFFICIAL
-#    musl build with a patchelf'd loader. Heavier, but independent.
-install_from_npm() {
-  command -v npm >/dev/null 2>&1 || { fail "npm not available"; return 1; }
-  info "Trying the npm package '$NPM_FALLBACK_PKG' (official musl build + Termux loader)..."
-  npm install -g "$NPM_FALLBACK_PKG" >>"$LOG_FILE" 2>&1 || { fail "npm install failed"; return 1; }
+# ── Source B: the same release, raw ELF binary. ──────────────────
+# The .deb ships exactly one file — usr/bin/opencode, a statically
+# self-contained Bionic binary — so if dpkg is broken we can place that
+# same file in $PREFIX/bin and get a byte-identical result. Checksum
+# verified against the same SHA256SUMS.
+install_from_bionic_binary() {
+  local tag ver url base
+  tag="$(resolve_bionic_tag)" || { fail "could not resolve a release tag"; return 1; }
+  [ -n "$tag" ] || { fail "could not resolve a release tag"; return 1; }
+  ver="${tag#v}"
+
+  case "$ver" in
+    *-dev.*|*-*)
+      fail "refusing dev/prerelease build '$ver' — its version string is rejected by the free tier."
+      return 1 ;;
+  esac
+
+  base="https://github.com/$BIONIC_REPO/releases/download/$tag"
+  url="$base/opencode"
+  info "opencode $ver from $BIONIC_REPO (raw binary — used when dpkg fails)"
+
+  info "Downloading the raw binary (~200 MB)..."
+  # Saved under the asset's own name so sha256sum -c can verify it against
+  # SHA256SUMS, exactly like the .deb path does.
+  if ! curl -fL --retry 3 --retry-delay 2 -C - --progress-bar \
+        -o "$CACHE/opencode" "$url" >>"$LOG_FILE" 2>&1; then
+    rm -f "$CACHE/opencode"
+    fail "download failed ($url)"
+    return 1
+  fi
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    info "Verifying SHA-256..."
+    if curl -fsSL --retry 2 --max-time 30 -o "$CACHE/SHA256SUMS" "$base/SHA256SUMS" 2>>"$LOG_FILE"; then
+      # SHA256SUMS also lists the .deb, which is not in the cache —
+      # sha256sum's --ignore-missing skips absent files by design.
+      if ( cd "$CACHE" && sha256sum -c --ignore-missing SHA256SUMS 2>&1 | grep -E '^opencode: OK' >/dev/null ); then
+        ok "checksum verified"
+      else
+        rm -f "$CACHE/opencode"
+        fail "checksum mismatch — refusing to install a corrupt download"
+        return 1
+      fi
+    else
+      warn "could not fetch SHA256SUMS — installing without verification"
+    fi
+  fi
+
+  chmod 755 "$CACHE/opencode"
+  if ! "$CACHE/opencode" --version >/dev/null 2>&1; then
+    rm -f "$CACHE/opencode"
+    fail "the downloaded binary did not run"
+    return 1
+  fi
+  mv "$CACHE/opencode" "$PREFIX/bin/opencode" || { rm -f "$CACHE/opencode"; fail "could not write $PREFIX/bin/opencode"; return 1; }
   hash -r 2>/dev/null
-  command -v opencode >/dev/null 2>&1 || { fail "opencode not on PATH after npm install"; return 1; }
-  # First run provisions ~/.opencode (download + verify). Give it room.
-  info "First run provisions the runtime — this may take a minute..."
-  opencode --version >/dev/null 2>&1
-  ok "installed via npm"
+  command -v opencode >/dev/null 2>&1 || { fail "opencode not on PATH after install"; return 1; }
+  ok "installed to $PREFIX/bin/opencode (not tracked by dpkg)"
 }
 
 installed_ok=false
@@ -383,13 +469,18 @@ fi
 if [ "$installed_ok" != true ]; then
   case "$want" in
     bionic) try_source "bionic-deb" install_from_bionic ;;
-    npm)    try_source "npm-musl"  install_from_npm ;;
+    binary) try_source "bionic-binary" install_from_bionic_binary ;;
+    npm)
+      warn "OPENCODE_SOURCE=npm was removed — the npm package (opencode-termux) is v1-only, and v1 no longer supports free models."
+      info "Using the Bionic sources instead."
+      try_source "bionic-deb" install_from_bionic \
+        || try_source "bionic-binary" install_from_bionic_binary ;;
     auto)
       try_source "bionic-deb" install_from_bionic \
-        || try_source "npm-musl" install_from_npm
+        || try_source "bionic-binary" install_from_bionic_binary
       ;;
-    *) warn "unknown OPENCODE_SOURCE='$want' — using auto"; 
-       try_source "bionic-deb" install_from_bionic || try_source "npm-musl" install_from_npm ;;
+    *) warn "unknown OPENCODE_SOURCE='$want' — using auto";
+       try_source "bionic-deb" install_from_bionic || try_source "bionic-binary" install_from_bionic_binary ;;
   esac
 fi
 
@@ -402,17 +493,17 @@ fi
 if [ "$installed_ok" != true ]; then
   printf '\n'
   fail "Could not install opencode $MIN_OPENCODE or newer."
-  info  "Both sources failed. This is usually a network problem."
+  info  "Both sources failed (the .deb and the raw binary). This is usually a network problem."
   info  ""
   info  "Try again — the installer resumes partial downloads:"
   info  "    curl -fsSL https://raw.githubusercontent.com/SLIXKI/opencode-termux/main/install.sh | bash"
   info  ""
-  info  "Or install the fallback source by hand:"
-  info  "    pkg install -y nodejs-lts && npm install -g $NPM_FALLBACK_PKG"
+  info  "Or download the .deb by hand from the release page, then install it:"
+  info  "    https://github.com/$BIONIC_REPO/releases/latest"
+  info  "    dpkg -i opencode_*_aarch64.deb"
   info  ""
-  info  "Note: the older guysoft/opencode-termux build (1.17.9) is NOT installed"
-  info  "as a fallback, because it is below $MIN_OPENCODE and the free tier would"
-  info  "reject it with the exact error you are trying to fix."
+  info  "Note: the npm package 'opencode-termux' is NOT used as a fallback —"
+  info  "it ships v1, and v1 no longer supports free models."
   die "See $LOG_FILE for details."
 fi
 
@@ -431,62 +522,10 @@ write_opencode_json() {
 cat >"$1" <<'__OC_JSON__'
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/deepseek-v4-flash-free",
-  "small_model": "opencode/big-pickle",
-  "provider": {
-    "opencode": {
-      "options": {
-        "apiKey": "{env:OPENCODE_API_KEY}",
-        "baseURL": "https://opencode.ai/zen/v1"
-      },
-      "models": {
-        "deepseek-v4-flash-free": {
-          "name": "DeepSeek V4 Flash (Zen free)",
-          "limit": { "context": 200000, "output": 128000 }
-        },
-        "big-pickle": {
-          "name": "Big Pickle (Zen free)",
-          "limit": { "context": 200000, "output": 32000 }
-        },
-        "mimo-v2.5-free": {
-          "name": "MiMo V2.5 (Zen free)",
-          "limit": { "context": 200000, "output": 32000 }
-        },
-        "nemotron-3-ultra-free": {
-          "name": "Nemotron 3 Ultra (Zen free)",
-          "limit": { "context": 1000000, "output": 128000 }
-        },
-        "nemotron-3.5-lightning-free": {
-          "name": "Nemotron 3.5 Lightning (Zen free)",
-          "limit": { "context": 262144, "output": 262144 }
-        },
-        "north-mini-code-free": {
-          "name": "North Mini Code (Zen free)",
-          "limit": { "context": 256000, "output": 64000 }
-        },
-        "ling-3.0-flash-free": {
-          "name": "Ling 3.0 Flash (Zen free)",
-          "limit": { "context": 262144, "output": 32768 }
-        },
-        "laguna-s-2.1-free": {
-          "name": "Laguna S 2.1 (Zen free)",
-          "limit": { "context": 256000, "output": 32000 }
-        },
-        "hy3-free": {
-          "name": "Hy3 (Zen free)",
-          "limit": { "context": 190000, "output": 64000 }
-        }
-      }
-    },
-    "google": {
-      "options": {
-        "apiKey": "{env:GEMINI_API_KEY}"
-      }
-    },
-    "openrouter": {
-      "options": {
-        "apiKey": "{env:OPENROUTER_API_KEY}"
-      }
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "agents": {
+    "title": {
+      "model": "opencode/big-pickle"
     }
   }
 }
@@ -529,14 +568,18 @@ a repository and get committed by accident.
 
 ## If a provider or model error appears
 
-The free OpenCode Zen tier is gated and rate-limited, and the free roster rotates.
-When you see `FreeTierError`, "free tier", "rate limit", or "quota exceeded":
+The free OpenCode models are limited-time and rate-limited, and the free roster
+rotates. When you see a provider/Console error, "free", "rate limit", or
+"quota exceeded":
 
 1. Do **not** retry the same request in a loop — it will keep failing.
 2. Tell the user to press `/models` and pick a different free model
-   (e.g. `opencode/big-pickle`, `opencode/mimo-v2.5-free`).
-3. If every free model fails, mention that the free tier requires opencode
-   **1.18.0 or newer**, and that re-running the one-line installer updates it.
+   (e.g. `opencode/deepseek-v4.1-flash-free`, `opencode/big-pickle`,
+   `opencode/glm-5.3-flash-free`).
+3. If every free model fails, mention that **OpenCode v1 no longer supports
+   free models** — a v2 client connected to an OpenCode Console account (or
+   with `OPENCODE_API_KEY` set) is required. Re-running the one-line installer
+   updates opencode to the latest v2.
 4. Long sessions fail most often during **compaction**. Suggest `/compact` early,
    or `/new` to start a fresh session, rather than letting context fill up.
 
@@ -606,12 +649,14 @@ if [ -f "$HOME/opencode/AGENTS.md" ] && grep -q "opencode-mobile — Global Rule
 fi
 
 # ══════════════════════════════════════════════════════════════════
-#  5. API key (optional — the free tier also works anonymously)
+#  5. OpenCode Console account (free — needed for the free models)
 # ══════════════════════════════════════════════════════════════════
-step "5/9  OpenCode API key (optional)"
+step "5/9  OpenCode Console key (free)"
 
-info "The Zen free models work without a key, but a free account key raises"
-info "your rate limits. Get one (no card required): https://opencode.ai/auth"
+info "Since OpenCode 2, the built-in OpenCode provider needs a free Console"
+info "account — anonymous access is gone. Sign up (free) and copy an API key:"
+info "  https://opencode.ai/console/signup"
+info "Without a key the free models will not appear in /models."
 
 api_key="${OPENCODE_API_KEY:-}"
 if [ -z "$api_key" ] && have_tty && [ "${OPENCODE_MOBILE_YES:-0}" != "1" ]; then
@@ -631,7 +676,7 @@ if [ -n "$api_key" ]; then
   chmod 600 "$HOME/.bashrc" 2>/dev/null
   ok "OPENCODE_API_KEY saved to ~/.bashrc"
 else
-  skip "no key added — free models still work; add one later with /connect"
+  skip "no key added — add one later with /connect (the free models need it)"
 fi
 
 # ══════════════════════════════════════════════════════════════════
@@ -776,14 +821,16 @@ printf '%s\n' "  2) Type:  ${c_b}AI${c_x}"
 printf '%s\n' "     ${c_d}AI myapp  -> opens or creates ~/opencode/myapp${c_x}"
 printf '%s\n' "  3) Ask for what you want in plain English."
 printf '\n'
-printf '%s\n' "  ${c_b}If you still see a free-tier error:${c_x}"
+printf '%s\n' "  ${c_b}If the free models do not appear in /models:${c_x}"
+printf '%s\n' "    - sign up at https://opencode.ai/console/signup (free) and paste your key"
+printf '%s\n' "      (inside opencode: /connect -> OpenCode), or re-run this installer"
 printf '%s\n' "    - press /models and pick another free model"
 printf '%s\n' "    - on long chats press /compact early, or /new for a fresh session"
 printf '%s\n' "    - re-run this one line to update opencode again"
 printf '\n'
 if [ -z "$api_key" ]; then
-  printf '%s\n' "  Optional: add a free key for higher limits at https://opencode.ai/auth"
-  printf '%s\n' "  (inside opencode: /connect -> OpenCode Zen)"
+  printf '%s\n' "  No key pasted — sign up at https://opencode.ai/console/signup and run /connect"
+  printf '%s\n' "  inside opencode to enable the free models."
   printf '\n'
 fi
 printf '%s\n' "  Installed: opencode $final_v  via $source_used"
